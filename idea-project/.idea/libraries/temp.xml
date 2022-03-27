@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="temp">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../mcp918/temp/minecraft_ff_out.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../mcp918/temp/minecraft_ff_in.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../mcp918/temp/minecraft_exc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../mcp918/temp/minecraft_ff_extra.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../mcp918/temp/minecraft_rg.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

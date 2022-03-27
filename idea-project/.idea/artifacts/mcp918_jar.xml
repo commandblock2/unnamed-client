@@ -1,0 +1,11 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="mcp918:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/mcp918_jar</output-path>
+    <root id="archive" name="unnamed.jar">
+      <element id="module-output" name="mcp918" />
+      <element id="directory" name="assets">
+        <element id="dir-copy" path="$PROJECT_DIR$/../assets/minecraft-unpack/assets" />
+      </element>
+    </root>
+  </artifact>
+</component>

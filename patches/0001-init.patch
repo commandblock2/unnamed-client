@@ -1,0 +1,12 @@
+diff --git a/src/minecraft/net/unnamed/Unnamed.scala b/src/minecraft/net/unnamed/Unnamed.scala
+new file mode 100644
+index 0000000..5c4b409
+--- /dev/null
++++ b/src/minecraft/net/unnamed/Unnamed.scala
+@@ -0,0 +1,6 @@
++package net.unnamed
++
++object Unnamed {
++  val name = "unnamed"
++  val version = "0.0.0"
++}

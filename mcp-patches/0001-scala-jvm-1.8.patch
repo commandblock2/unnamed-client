@@ -1,0 +1,39 @@
+diff --git a/conf/mcp.cfg b/conf/mcp.cfg
+index b445a45..6b42955 100644
+--- a/conf/mcp.cfg
++++ b/conf/mcp.cfg
+@@ -174,7 +174,7 @@ CmdJadretro   = %s -jar %s {targetdir}
+ CmdFernflower = %s -jar %s -din=1 -rbr=1 -dgs=1 -asc=1 -rsy=1 -iec=1 -jvn=1 -log=WARN {extra} {indir} {outdir}
+ CmdExceptor   = %s -jar %s --jarIn {input} --jarOut {output} --mapIn {conf} --log {log} --applyMarkers --generateParams --lvt=LVT
+ CmdExceptorDry = %s -jar %s --jarIn {input} --mapIn {conf} --log {log} --applyMarkers --lvt=LVT
+-CmdRecomp     = %s -Xlint:-options -deprecation -g -source 1.6 -target 1.6 -classpath "{classpath}" -sourcepath {sourcepath} -d {outpath} @{javasrc}
+-CmdRecompScala = %s -encoding UTF-8 -deprecation -target:jvm-1.6 -classpath "{classpath}" -sourcepath {sourcepath} -d {outpath} @{javasrc} @{scalasrc}
++CmdRecomp     = %s -Xlint:-options -deprecation -g -source 1.8 -target 1.8 -classpath "{classpath}" -sourcepath {sourcepath} -d {outpath} @{javasrc}
++CmdRecompScala = %s -encoding UTF-8 -deprecation -target:jvm-1.8 -classpath "{classpath}" -sourcepath {sourcepath} -d {outpath} @{javasrc} @{scalasrc}
+ CmdStartSrv   = %s -Xincgc -Xms1024M -Xmx1024M -cp "{classpath}" net.minecraft.server.MinecraftServer
+ CmdStartClt   = %s -Xincgc -Xms1024M -Xmx1024M -cp "{classpath}" -Djava.library.path={natives} Start
+diff --git a/runtime/commands.py b/runtime/commands.py
+index 1d53eb5..7c76d51 100644
+--- a/runtime/commands.py
++++ b/runtime/commands.py
+@@ -920,9 +920,9 @@ class Commands(object):
+             self.cmdscalac = '"%s"' % cmd
+             
+             try:
+-                self.runcmd('%s -target:jvm-1.6 -version' % self.cmdscalac, quiet=True)
++                self.runcmd('%s -target:jvm-1.8 -version' % self.cmdscalac, quiet=True)
+             except (CalledProcessError, OSError):
+-                self.logger.info('%s does not support jvm-1.6 target, it is out of date. Ignoring' % self.cmdscalac)
++                self.logger.info('%s does not support jvm-1.8 target, it is out of date. Ignoring' % self.cmdscalac)
+                 self.cmdscalac = None
+         
+     def checkjars(self, side):
+@@ -1576,7 +1576,7 @@ class Commands(object):
+                 self.logger.error('')
+                 for line in ex.output.splitlines():
+                     if line.strip():
+-                        if line.find("jvm-1.6") != -1:
++                        if line.find("jvm-1.8") != -1:
+                             self.logger.error(' === Your scala version is out of date, update to at least 2.10.0 ===')
+                         if line[0] != '[' and line[0:4] != 'Note':
+                             self.logger.error(line)
