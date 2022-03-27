@@ -13,6 +13,9 @@ bash ./decompile.sh
 git add .
 git commit -m "decompiled minecraft"
 
+cd ../assets/
+unzip -o ../mcp918/jars/versions/1.8.8/1.8.8.jar -d minecraft-unpack
+
 for patch in ../patches/*
 do
     echo applying $patch
