@@ -2,7 +2,7 @@
 A FOSS mcp hacked client for minecraft intended for at least half standard users.
 ## Building on *nix
 ### Prerequisites
-`net-misc/curl` `sys-apps/coreutils` `app-arch/unzip`.  
+`net-misc/curl` `sys-apps/coreutils` `app-arch/unzip` `dev-python/virtualenv`.  
 A instance of 1.8.8 is presented in the default path ready for mcp.      
 If located elsewhere, `mount --rbind` or `overlayfs` could be an option, MultiMC doesn't seem to be nice here.
 
