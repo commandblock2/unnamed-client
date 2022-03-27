@@ -1,0 +1,12 @@
+diff --git a/mcp918.iml b/mcp918.iml
+index cec62d6..f77ebaf 100644
+--- a/mcp918.iml
++++ b/mcp918.iml
+@@ -58,5 +58,6 @@
+     <orderEntry type="library" name="codecwav-20101023" level="project" />
+     <orderEntry type="library" name="commons-codec-1.9" level="project" />
+     <orderEntry type="library" name="log4j-core-2.0-beta9" level="project" />
++    <orderEntry type="library" name="javax.vecmath" level="project" />
+   </component>
+ </module>
+\ No newline at end of file

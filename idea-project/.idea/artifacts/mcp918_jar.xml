@@ -5,6 +5,7 @@
       <element id="module-output" name="mcp918" />
       <element id="directory" name="assets">
         <element id="dir-copy" path="$PROJECT_DIR$/../assets/minecraft-unpack/assets" />
+        <element id="dir-copy" path="$PROJECT_DIR$/../mcp918/src/minecraft/assets" />
       </element>
     </root>
   </artifact>

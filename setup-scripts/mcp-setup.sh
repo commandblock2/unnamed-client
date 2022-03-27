@@ -35,10 +35,6 @@ git init .
 git add .
 git commit -m init
 
-unzip -o ../optifine-src.zip -d .
-git add .
-git commit -m "extracted optifine"
-
 git apply ../mcp-patches/*
 git add .
 git commit -m "applied mcp patches"
