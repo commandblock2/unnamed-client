@@ -35,20 +35,21 @@ index b8c0414..5fcd2f0 100644
          this.defaultResourcePacks.add(this.mcDefaultResourcePack);
          this.startTimerHackThread();
 diff --git a/src/minecraft/net/minecraft/network/NetworkManager.java b/src/minecraft/net/minecraft/network/NetworkManager.java
-index 9349d37..3ff9aea 100644
+index 9349d37..de5b9bb 100644
 --- a/src/minecraft/net/minecraft/network/NetworkManager.java
 +++ b/src/minecraft/net/minecraft/network/NetworkManager.java
-@@ -42,6 +42,9 @@ import net.minecraft.util.MessageDeserializer;
+@@ -42,6 +42,10 @@ import net.minecraft.util.MessageDeserializer;
  import net.minecraft.util.MessageDeserializer2;
  import net.minecraft.util.MessageSerializer;
  import net.minecraft.util.MessageSerializer2;
++import net.unnamed.event.ClientBoundPacketEvent;
 +import net.unnamed.event.EventBus;
 +import net.unnamed.event.PacketEvent;
 +import net.unnamed.event.ServerBoundPacketEvent;
  import org.apache.commons.lang3.ArrayUtils;
  import org.apache.commons.lang3.Validate;
  import org.apache.logging.log4j.LogManager;
-@@ -148,6 +151,15 @@ public class NetworkManager extends SimpleChannelInboundHandler<Packet>
+@@ -148,6 +152,15 @@ public class NetworkManager extends SimpleChannelInboundHandler<Packet>
  
      protected void channelRead0(ChannelHandlerContext p_channelRead0_1_, Packet p_channelRead0_2_) throws Exception
      {
@@ -64,6 +65,21 @@ index 9349d37..3ff9aea 100644
          if (this.channel.isOpen())
          {
              try
+@@ -174,6 +187,14 @@ public class NetworkManager extends SimpleChannelInboundHandler<Packet>
+ 
+     public void sendPacket(Packet packetIn)
+     {
++        PacketEvent event = new PacketEvent(packetIn);
++        ClientBoundPacketEvent clientBoundPacketEvent = new ClientBoundPacketEvent(packetIn);
++        EventBus.fireEvent(event);
++        EventBus.fireEvent(clientBoundPacketEvent);
++
++        if (event.isCanceled() || clientBoundPacketEvent.isCanceled())
++            return;
++
+         if (this.isChannelOpen())
+         {
+             this.flushOutboundQueue();
 diff --git a/src/minecraft/net/unnamed/Unnamed.scala b/src/minecraft/net/unnamed/Unnamed.scala
 index 5c4b409..84005f8 100644
 --- a/src/minecraft/net/unnamed/Unnamed.scala
