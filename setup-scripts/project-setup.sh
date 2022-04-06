@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This currently assumes that you have already launched 1.8.8
-SCRIPTS_DIR=$(dirname "$0")
+SCRIPTS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 bash $SCRIPTS_DIR/mcp-setup.sh
 bash $SCRIPTS_DIR/venv-setup.sh

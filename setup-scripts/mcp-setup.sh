@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 MCP_URL=http://www.modcoderpack.com/files/mcp918.zip
 OPTIFINE_URL=https://raw.githubusercontent.com/Hexeption/Optifine-SRC/master/Optifine%20SRC%20Version%20%5B1.8.8%20HD%20U%20H8%5D.zip
-SCRIPTS_DIR=$(dirname "$0")
+SCRIPTS_DIR=SCRIPTS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 cd $SCRIPTS_DIR/..
 
