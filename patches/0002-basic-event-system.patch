@@ -1,5 +1,5 @@
 diff --git a/jars/saves/MCP Development World/level.dat b/jars/saves/MCP Development World/level.dat
-index b9b3a91..6825099 100644
+index b9b3a91..1bdb00f 100644
 Binary files a/jars/saves/MCP Development World/level.dat and b/jars/saves/MCP Development World/level.dat differ
 diff --git a/mcp918.iml b/mcp918.iml
 index cec62d6..f77ebaf 100644
@@ -13,6 +13,19 @@ index cec62d6..f77ebaf 100644
    </component>
  </module>
 \ No newline at end of file
+diff --git a/src/minecraft/fuck/you/scala/Utils.scala b/src/minecraft/fuck/you/scala/Utils.scala
+new file mode 100644
+index 0000000..df06158
+--- /dev/null
++++ b/src/minecraft/fuck/you/scala/Utils.scala
+@@ -0,0 +1,7 @@
++package fuck.you.scala
++
++object Utils {
++  def removeASingleElementFromList[T](element: T, list: List[T]): List[T] =
++    list diff List(element)
++
++}
 diff --git a/src/minecraft/net/minecraft/client/Minecraft.java b/src/minecraft/net/minecraft/client/Minecraft.java
 index b8c0414..5fcd2f0 100644
 --- a/src/minecraft/net/minecraft/client/Minecraft.java
@@ -35,7 +48,7 @@ index b8c0414..5fcd2f0 100644
          this.defaultResourcePacks.add(this.mcDefaultResourcePack);
          this.startTimerHackThread();
 diff --git a/src/minecraft/net/minecraft/network/NetworkManager.java b/src/minecraft/net/minecraft/network/NetworkManager.java
-index 9349d37..de5b9bb 100644
+index 9349d37..97d6f8f 100644
 --- a/src/minecraft/net/minecraft/network/NetworkManager.java
 +++ b/src/minecraft/net/minecraft/network/NetworkManager.java
 @@ -42,6 +42,10 @@ import net.minecraft.util.MessageDeserializer;
@@ -55,8 +68,8 @@ index 9349d37..de5b9bb 100644
      {
 +        PacketEvent event = new PacketEvent(p_channelRead0_2_);
 +        ServerBoundPacketEvent serverBoundPacketEvent = new ServerBoundPacketEvent(p_channelRead0_2_);
-+        EventBus.fireEvent(event);
-+        EventBus.fireEvent(serverBoundPacketEvent);
++        EventBus.fireEventJ(event);
++        EventBus.fireEventJ(serverBoundPacketEvent);
 +
 +        if (event.isCanceled() || serverBoundPacketEvent.isCanceled())
 +            return;
@@ -71,8 +84,8 @@ index 9349d37..de5b9bb 100644
      {
 +        PacketEvent event = new PacketEvent(packetIn);
 +        ClientBoundPacketEvent clientBoundPacketEvent = new ClientBoundPacketEvent(packetIn);
-+        EventBus.fireEvent(event);
-+        EventBus.fireEvent(clientBoundPacketEvent);
++        EventBus.fireEventJ(event);
++        EventBus.fireEventJ(clientBoundPacketEvent);
 +
 +        if (event.isCanceled() || clientBoundPacketEvent.isCanceled())
 +            return;
@@ -81,25 +94,188 @@ index 9349d37..de5b9bb 100644
          {
              this.flushOutboundQueue();
 diff --git a/src/minecraft/net/unnamed/Unnamed.scala b/src/minecraft/net/unnamed/Unnamed.scala
-index 5c4b409..84005f8 100644
+index 5c4b409..8e04295 100644
 --- a/src/minecraft/net/unnamed/Unnamed.scala
 +++ b/src/minecraft/net/unnamed/Unnamed.scala
-@@ -1,6 +1,18 @@
+@@ -1,6 +1,12 @@
  package net.unnamed
  
-+import net.unnamed.event.{EventBus, Listener, PacketEvent}
++import net.unnamed.cheats.packet.triggered.Velocity
 +
  object Unnamed {
    val name = "unnamed"
    val version = "0.0.0"
 +
 +  val launch = {
-+    EventBus += new Listener[PacketEvent](classOf[PacketEvent]) {
++    Velocity.init
++  }
+ }
+diff --git a/src/minecraft/net/unnamed/cheats/Cheat.scala b/src/minecraft/net/unnamed/cheats/Cheat.scala
+new file mode 100644
+index 0000000..2cd01e0
+--- /dev/null
++++ b/src/minecraft/net/unnamed/cheats/Cheat.scala
+@@ -0,0 +1,7 @@
++package net.unnamed.cheats
++
++import net.unnamed.utils.MinecraftInstance
++
++trait Cheat extends MinecraftInstance {
++  var active: Boolean = false
++}
+diff --git a/src/minecraft/net/unnamed/cheats/packet/triggered/Velocity.scala b/src/minecraft/net/unnamed/cheats/packet/triggered/Velocity.scala
+new file mode 100644
+index 0000000..03bebaf
+--- /dev/null
++++ b/src/minecraft/net/unnamed/cheats/packet/triggered/Velocity.scala
+@@ -0,0 +1,24 @@
++package net.unnamed.cheats.packet.triggered
++
++import net.minecraft.network.play.server.S12PacketEntityVelocity
++import net.unnamed.cheats.Cheat
++import net.unnamed.event.{EventBus, Listener, PacketEvent}
++
++
++
++object Velocity extends Cheat {
++  val init = {
++    EventBus += new Listener[PacketEvent] {
 +      override def isActive: Boolean = true
 +
 +      override def callback(event: PacketEvent): Unit = {
-+        // System.out.print(event.packet)
++        event.packet match {
++          case packet: S12PacketEntityVelocity =>
++            if (packet.getEntityID == mc.thePlayer.getEntityId)
++              event.cancel()
++          case _ =>
++        }
 +      }
 +    }
 +  }
- }
++}
+diff --git a/src/minecraft/net/unnamed/event/Event.scala b/src/minecraft/net/unnamed/event/Event.scala
+new file mode 100644
+index 0000000..3dc83e6
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/Event.scala
+@@ -0,0 +1,19 @@
++package net.unnamed.event
++
++import net.minecraft.network.Packet
++
++trait Event
++
++abstract class CancelableEvent extends Event {
++  def cancel(): Unit = canceled = true
++
++  def isCanceled: Boolean = canceled
++
++  private var canceled = false
++}
++
++case class PacketEvent(packet: Packet[_]) extends CancelableEvent
++
++case class ServerBoundPacketEvent(packet: Packet[_]) extends CancelableEvent
++
++case class ClientBoundPacketEvent(packet: Packet[_]) extends CancelableEvent
+\ No newline at end of file
+diff --git a/src/minecraft/net/unnamed/event/EventBus.scala b/src/minecraft/net/unnamed/event/EventBus.scala
+new file mode 100644
+index 0000000..eae6403
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/EventBus.scala
+@@ -0,0 +1,60 @@
++package net.unnamed.event
++
++import fuck.you.scala.Utils.removeASingleElementFromList
++
++import scala.collection.mutable
++import scala.reflect.ClassTag
++
++
++object EventBus {
++
++  private val registry = new mutable.HashMap[ClassTag[Event], List[Listener[Event]]]
++    .withDefaultValue(Nil)
++
++  private val oneShot = new mutable.HashMap[ClassTag[Event], List[OneShotListener[Event]]]
++    .withDefaultValue(Nil)
++
++  def registerListener[SubEvent <: Event](listener: Listener[SubEvent]): EventBus.type = {
++    registry(listener.tag.asInstanceOf[ClassTag[Event]]) ::= listener.asInstanceOf[Listener[Event]]
++    this
++  }
++
++  def unRegisterListener[SubEvent <: Event](listener: Listener[SubEvent]): EventBus.type = {
++    val clazz = listener.tag.asInstanceOf[ClassTag[Event]]
++    registry(clazz) = removeASingleElementFromList(listener.asInstanceOf[Listener[Event]], registry(clazz))
++    this
++  }
++
++  def next[SubEvent <: Event](timesToCall: Int = 1)(callback: SubEvent => Unit)(implicit tag: ClassTag[SubEvent]): EventBus.type = {
++    next(OneShotListener(timesToCall)(callback)(tag))
++    this
++  }
++
++  def next[SubEvent <: Event](oneShotListener: OneShotListener[SubEvent]): EventBus.type = {
++    oneShot(oneShotListener.tag.asInstanceOf[ClassTag[Event]]) ::= oneShotListener.asInstanceOf[OneShotListener[Event]]
++    this
++  }
++
++  def fireEventJ[SubEvent <: Event](event: SubEvent): Unit = {
++    fireEvent(event)(ClassTag(event.getClass))
++  }
++
++  def fireEvent[SubEvent <: Event](event: SubEvent)(implicit tag: ClassTag[SubEvent]): Unit = {
++    registry(tag.asInstanceOf[ClassTag[Event]]).foreach((listener: Listener[Event]) => listener.callback(event))
++
++    oneShot(tag.asInstanceOf[ClassTag[Event]]) = oneShot(tag.asInstanceOf[ClassTag[Event]]).filter((listener: OneShotListener[Event]) => {
++      listener.timesToCall -= 1
++      if (listener.timesToCall == 0) {
++        listener.callback(event)
++        false
++      } else
++        true
++    })
++  }
++
++  def +=[SubEvent <: Event](listener: Listener[SubEvent]): EventBus.type =
++    registerListener(listener)
++
++  def -=[SubEvent <: Event](listener: Listener[SubEvent]): EventBus.type =
++    unRegisterListener(listener)
++}
+diff --git a/src/minecraft/net/unnamed/event/Listener.scala b/src/minecraft/net/unnamed/event/Listener.scala
+new file mode 100644
+index 0000000..82d4be0
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/Listener.scala
+@@ -0,0 +1,14 @@
++package net.unnamed.event
++
++import scala.reflect.ClassTag
++
++abstract class Listener[SubEvent <: Event](implicit val tag: ClassTag[SubEvent]) {
++  def isActive: Boolean
++
++  def callback(event: SubEvent): Unit
++}
++
++case class OneShotListener[SubEvent <: Event](var timesToCall: Int = 1)(val callback: SubEvent => Unit)(implicit val tag: ClassTag[SubEvent]) {
++  def cancel(): Unit =
++    timesToCall = 0
++}
+\ No newline at end of file
+diff --git a/src/minecraft/net/unnamed/utils/MinecraftInstance.scala b/src/minecraft/net/unnamed/utils/MinecraftInstance.scala
+new file mode 100644
+index 0000000..5c4a768
+--- /dev/null
++++ b/src/minecraft/net/unnamed/utils/MinecraftInstance.scala
+@@ -0,0 +1,7 @@
++package net.unnamed.utils
++
++import net.minecraft.client.Minecraft
++
++trait MinecraftInstance {
++  val mc: Minecraft = Minecraft.getMinecraft
++}
