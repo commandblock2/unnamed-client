@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Unnamed" type="Application" factoryName="Application" nameIsGenerated="true">
+  <configuration default="false" name="Unnamed" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="Start" />
     <module name="mcp918" />
     <option name="VM_PARAMETERS" value="-Dlog4j2.formatMsgNoLookups=true -Djava.library.path=&quot;versions/1.8.8/1.8.8-natives" />

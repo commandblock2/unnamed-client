@@ -24,18 +24,20 @@ index 0000000..df06158
 +
 +}
 diff --git a/src/minecraft/net/minecraft/client/Minecraft.java b/src/minecraft/net/minecraft/client/Minecraft.java
-index b8c0414..5fcd2f0 100644
+index b8c0414..795b08a 100644
 --- a/src/minecraft/net/minecraft/client/Minecraft.java
 +++ b/src/minecraft/net/minecraft/client/Minecraft.java
-@@ -167,6 +167,7 @@ import net.minecraft.world.chunk.storage.AnvilSaveConverter;
+@@ -167,6 +167,9 @@ import net.minecraft.world.chunk.storage.AnvilSaveConverter;
  import net.minecraft.world.storage.ISaveFormat;
  import net.minecraft.world.storage.ISaveHandler;
  import net.minecraft.world.storage.WorldInfo;
 +import net.unnamed.Unnamed;
++import net.unnamed.event.EventBus;
++import net.unnamed.event.vanilla.WorldEvent;
  import org.apache.commons.io.IOUtils;
  import org.apache.commons.lang3.Validate;
  import org.apache.logging.log4j.LogManager;
-@@ -464,6 +465,8 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+@@ -464,6 +467,8 @@ public class Minecraft implements IThreadListener, IPlayerUsage
       */
      private void startGame() throws LWJGLException, IOException
      {
@@ -44,118 +46,181 @@ index b8c0414..5fcd2f0 100644
          this.gameSettings = new GameSettings(this, this.mcDataDir);
          this.defaultResourcePacks.add(this.mcDefaultResourcePack);
          this.startTimerHackThread();
+@@ -2367,9 +2372,11 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+ 
+         this.mcSoundHandler.stopSounds();
+         this.theWorld = worldClientIn;
++        EventBus.fireEventJ(new WorldEvent(worldClientIn));
+ 
+         if (worldClientIn != null)
+         {
++
+             if (this.renderGlobal != null)
+             {
+                 this.renderGlobal.setWorldAndLoadRenderers(worldClientIn);
+diff --git a/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java b/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java
+index 86725b4..ea32192 100644
+--- a/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java
++++ b/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java
+@@ -209,6 +209,10 @@ import net.minecraft.world.WorldProviderSurface;
+ import net.minecraft.world.WorldSettings;
+ import net.minecraft.world.chunk.Chunk;
+ import net.minecraft.world.storage.MapData;
++import net.unnamed.antiexploit.AntiScanFromResourcePackConfirm;
++import net.unnamed.event.EventBus;
++import net.unnamed.event.unnamed.ProbeFromServerEvent;
++import net.unnamed.event.unnamed.ServerProbes;
+ import org.apache.logging.log4j.LogManager;
+ import org.apache.logging.log4j.Logger;
+ 
+@@ -1709,6 +1713,14 @@ public class NetHandlerPlayClient implements INetHandlerPlayClient
+             File file1 = new File(this.gameController.mcDataDir, "saves");
+             File file2 = new File(file1, s2);
+ 
++            if (AntiScanFromResourcePackConfirm.isOn() && !file2.getAbsolutePath().equals(file1.getAbsolutePath())) {
++                // TODO: test this
++                EventBus.fireEventJ(new ProbeFromServerEvent(ServerProbes.FILE_PROB_OUT_OF_RCPACK_FOLDER(), file2.getAbsoluteFile().getName()));
++                this.netManager.sendPacket(new C19PacketResourcePackStatus(s1, C19PacketResourcePackStatus.Action.FAILED_DOWNLOAD));
++                return;
++            }
++
++
+             if (file2.isFile())
+             {
+                 this.netManager.sendPacket(new C19PacketResourcePackStatus(s1, C19PacketResourcePackStatus.Action.ACCEPTED));
 diff --git a/src/minecraft/net/minecraft/network/NetworkManager.java b/src/minecraft/net/minecraft/network/NetworkManager.java
-index 9349d37..97d6f8f 100644
+index 9349d37..6fd15e3 100644
 --- a/src/minecraft/net/minecraft/network/NetworkManager.java
 +++ b/src/minecraft/net/minecraft/network/NetworkManager.java
-@@ -42,6 +42,10 @@ import net.minecraft.util.MessageDeserializer;
+@@ -42,6 +42,9 @@ import net.minecraft.util.MessageDeserializer;
  import net.minecraft.util.MessageDeserializer2;
  import net.minecraft.util.MessageSerializer;
  import net.minecraft.util.MessageSerializer2;
-+import net.unnamed.event.ClientBoundPacketEvent;
++
 +import net.unnamed.event.EventBus;
-+import net.unnamed.event.PacketEvent;
-+import net.unnamed.event.ServerBoundPacketEvent;
++import net.unnamed.event.vanilla.PacketEvent;
  import org.apache.commons.lang3.ArrayUtils;
  import org.apache.commons.lang3.Validate;
  import org.apache.logging.log4j.LogManager;
-@@ -148,6 +152,15 @@ public class NetworkManager extends SimpleChannelInboundHandler<Packet>
+@@ -148,6 +151,13 @@ public class NetworkManager extends SimpleChannelInboundHandler<Packet>
  
      protected void channelRead0(ChannelHandlerContext p_channelRead0_1_, Packet p_channelRead0_2_) throws Exception
      {
 +        PacketEvent event = new PacketEvent(p_channelRead0_2_);
-+        ServerBoundPacketEvent serverBoundPacketEvent = new ServerBoundPacketEvent(p_channelRead0_2_);
 +        EventBus.fireEventJ(event);
-+        EventBus.fireEventJ(serverBoundPacketEvent);
 +
-+        if (event.isCanceled() || serverBoundPacketEvent.isCanceled())
++        if (event.isCanceled())
 +            return;
 +
 +
          if (this.channel.isOpen())
          {
              try
-@@ -174,6 +187,14 @@ public class NetworkManager extends SimpleChannelInboundHandler<Packet>
+@@ -174,6 +184,12 @@ public class NetworkManager extends SimpleChannelInboundHandler<Packet>
  
      public void sendPacket(Packet packetIn)
      {
 +        PacketEvent event = new PacketEvent(packetIn);
-+        ClientBoundPacketEvent clientBoundPacketEvent = new ClientBoundPacketEvent(packetIn);
 +        EventBus.fireEventJ(event);
-+        EventBus.fireEventJ(clientBoundPacketEvent);
 +
-+        if (event.isCanceled() || clientBoundPacketEvent.isCanceled())
++        if (event.isCanceled())
 +            return;
 +
          if (this.isChannelOpen())
          {
              this.flushOutboundQueue();
+diff --git a/src/minecraft/net/minecraft/network/play/server/S12PacketEntityVelocity.java b/src/minecraft/net/minecraft/network/play/server/S12PacketEntityVelocity.java
+index 6696c6d..5878d74 100644
+--- a/src/minecraft/net/minecraft/network/play/server/S12PacketEntityVelocity.java
++++ b/src/minecraft/net/minecraft/network/play/server/S12PacketEntityVelocity.java
+@@ -9,9 +9,9 @@ import net.minecraft.network.play.INetHandlerPlayClient;
+ public class S12PacketEntityVelocity implements Packet<INetHandlerPlayClient>
+ {
+     private int entityID;
+-    private int motionX;
+-    private int motionY;
+-    private int motionZ;
++    public int motionX;
++    public int motionY;
++    public int motionZ;
+ 
+     public S12PacketEntityVelocity()
+     {
 diff --git a/src/minecraft/net/unnamed/Unnamed.scala b/src/minecraft/net/unnamed/Unnamed.scala
-index 5c4b409..8e04295 100644
+index 5c4b409..1cc8d1e 100644
 --- a/src/minecraft/net/unnamed/Unnamed.scala
 +++ b/src/minecraft/net/unnamed/Unnamed.scala
-@@ -1,6 +1,12 @@
+@@ -1,6 +1,18 @@
  package net.unnamed
  
-+import net.unnamed.cheats.packet.triggered.Velocity
++import net.unnamed.event.EventBus
++import net.unnamed.event.unnamed.UnnamedListeners
++import net.unnamed.modules.Modules
 +
  object Unnamed {
    val name = "unnamed"
    val version = "0.0.0"
 +
-+  val launch = {
-+    Velocity.init
++  val eventBus: EventBus.type = EventBus
++
++  val launch: Unit = {
++    UnnamedListeners
++    Modules
++
 +  }
  }
-diff --git a/src/minecraft/net/unnamed/cheats/Cheat.scala b/src/minecraft/net/unnamed/cheats/Cheat.scala
+diff --git a/src/minecraft/net/unnamed/antiexploit/AntiScanFromResourcePackConfirm.scala b/src/minecraft/net/unnamed/antiexploit/AntiScanFromResourcePackConfirm.scala
 new file mode 100644
-index 0000000..2cd01e0
+index 0000000..7a83f5d
 --- /dev/null
-+++ b/src/minecraft/net/unnamed/cheats/Cheat.scala
-@@ -0,0 +1,7 @@
-+package net.unnamed.cheats
++++ b/src/minecraft/net/unnamed/antiexploit/AntiScanFromResourcePackConfirm.scala
+@@ -0,0 +1,9 @@
++package net.unnamed.antiexploit
 +
-+import net.unnamed.utils.MinecraftInstance
++import net.unnamed.utils.common.interface.Toggleable
 +
-+trait Cheat extends MinecraftInstance {
-+  var active: Boolean = false
-+}
-diff --git a/src/minecraft/net/unnamed/cheats/packet/triggered/Velocity.scala b/src/minecraft/net/unnamed/cheats/packet/triggered/Velocity.scala
-new file mode 100644
-index 0000000..03bebaf
---- /dev/null
-+++ b/src/minecraft/net/unnamed/cheats/packet/triggered/Velocity.scala
-@@ -0,0 +1,24 @@
-+package net.unnamed.cheats.packet.triggered
-+
-+import net.minecraft.network.play.server.S12PacketEntityVelocity
-+import net.unnamed.cheats.Cheat
-+import net.unnamed.event.{EventBus, Listener, PacketEvent}
-+
-+
-+
-+object Velocity extends Cheat {
-+  val init = {
-+    EventBus += new Listener[PacketEvent] {
-+      override def isActive: Boolean = true
-+
-+      override def callback(event: PacketEvent): Unit = {
-+        event.packet match {
-+          case packet: S12PacketEntityVelocity =>
-+            if (packet.getEntityID == mc.thePlayer.getEntityId)
-+              event.cancel()
-+          case _ =>
-+        }
-+      }
-+    }
++object AntiScanFromResourcePackConfirm extends Toggleable {
++  {
++    on()
 +  }
++}
+\ No newline at end of file
+diff --git a/src/minecraft/net/unnamed/cheats/packet/modification/Velocity.scala b/src/minecraft/net/unnamed/cheats/packet/modification/Velocity.scala
+new file mode 100644
+index 0000000..369d758
+--- /dev/null
++++ b/src/minecraft/net/unnamed/cheats/packet/modification/Velocity.scala
+@@ -0,0 +1,24 @@
++package net.unnamed.cheats.packet.modification
++
++import net.unnamed.event.unnamed.PlayerKnockBackEvent
++import net.unnamed.utils.common.interface.MinecraftInstance
++
++import javax.vecmath.Vector2d
++
++
++object Velocity extends MinecraftInstance {
++
++  def cancelPlayerKnockBackEvent(event: PlayerKnockBackEvent): Unit = {
++    event.cancel()
++  }
++
++  def modifyKnockBackBy(event: PlayerKnockBackEvent)(byVertical: Double)(byHorizontal: Vector2d): Unit = {
++    val packet = event.packet
++
++    packet.motionY = (packet.motionY * byVertical).toInt
++
++    packet.motionX = (packet.motionX * byHorizontal.x).toInt
++    packet.motionZ = (packet.motionZ * byHorizontal.y).toInt
++  }
++
 +}
 diff --git a/src/minecraft/net/unnamed/event/Event.scala b/src/minecraft/net/unnamed/event/Event.scala
 new file mode 100644
-index 0000000..3dc83e6
+index 0000000..4de1fe6
 --- /dev/null
 +++ b/src/minecraft/net/unnamed/event/Event.scala
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,13 @@
 +package net.unnamed.event
 +
 +import net.minecraft.network.Packet
@@ -169,19 +234,12 @@ index 0000000..3dc83e6
 +
 +  private var canceled = false
 +}
-+
-+case class PacketEvent(packet: Packet[_]) extends CancelableEvent
-+
-+case class ServerBoundPacketEvent(packet: Packet[_]) extends CancelableEvent
-+
-+case class ClientBoundPacketEvent(packet: Packet[_]) extends CancelableEvent
-\ No newline at end of file
 diff --git a/src/minecraft/net/unnamed/event/EventBus.scala b/src/minecraft/net/unnamed/event/EventBus.scala
 new file mode 100644
-index 0000000..eae6403
+index 0000000..c815aaa
 --- /dev/null
 +++ b/src/minecraft/net/unnamed/event/EventBus.scala
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,62 @@
 +package net.unnamed.event
 +
 +import fuck.you.scala.Utils.removeASingleElementFromList
@@ -190,13 +248,15 @@ index 0000000..eae6403
 +import scala.reflect.ClassTag
 +
 +
-+object EventBus {
++case object EventBus {
 +
 +  private val registry = new mutable.HashMap[ClassTag[Event], List[Listener[Event]]]
 +    .withDefaultValue(Nil)
 +
 +  private val oneShot = new mutable.HashMap[ClassTag[Event], List[OneShotListener[Event]]]
 +    .withDefaultValue(Nil)
++
++
 +
 +  def registerListener[SubEvent <: Event](listener: Listener[SubEvent]): EventBus.type = {
 +    registry(listener.tag.asInstanceOf[ClassTag[Event]]) ::= listener.asInstanceOf[Listener[Event]]
@@ -244,10 +304,10 @@ index 0000000..eae6403
 +}
 diff --git a/src/minecraft/net/unnamed/event/Listener.scala b/src/minecraft/net/unnamed/event/Listener.scala
 new file mode 100644
-index 0000000..82d4be0
+index 0000000..34e2377
 --- /dev/null
 +++ b/src/minecraft/net/unnamed/event/Listener.scala
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,20 @@
 +package net.unnamed.event
 +
 +import scala.reflect.ClassTag
@@ -258,21 +318,296 @@ index 0000000..82d4be0
 +  def callback(event: SubEvent): Unit
 +}
 +
++class AlwaysActiveListener[SubEvent <: Event](val callbackFunc: SubEvent => Unit)(implicit override val tag: ClassTag[SubEvent]) extends Listener[SubEvent] {
++  override def isActive = true
++
++  override def callback(event: SubEvent): Unit = callbackFunc(event)
++}
++
 +case class OneShotListener[SubEvent <: Event](var timesToCall: Int = 1)(val callback: SubEvent => Unit)(implicit val tag: ClassTag[SubEvent]) {
 +  def cancel(): Unit =
 +    timesToCall = 0
 +}
 \ No newline at end of file
-diff --git a/src/minecraft/net/unnamed/utils/MinecraftInstance.scala b/src/minecraft/net/unnamed/utils/MinecraftInstance.scala
+diff --git a/src/minecraft/net/unnamed/event/unnamed/ModuleToggleEvent.scala b/src/minecraft/net/unnamed/event/unnamed/ModuleToggleEvent.scala
 new file mode 100644
-index 0000000..5c4a768
+index 0000000..d717a98
 --- /dev/null
-+++ b/src/minecraft/net/unnamed/utils/MinecraftInstance.scala
++++ b/src/minecraft/net/unnamed/event/unnamed/ModuleToggleEvent.scala
+@@ -0,0 +1,6 @@
++package net.unnamed.event.unnamed
++
++import net.unnamed.event.Event
++import net.unnamed.modules.Module
++
++case class ModuleToggleEvent(module: Module) extends Event
+\ No newline at end of file
+diff --git a/src/minecraft/net/unnamed/event/unnamed/PlayerKnockBackEvent.scala b/src/minecraft/net/unnamed/event/unnamed/PlayerKnockBackEvent.scala
+new file mode 100644
+index 0000000..412af57
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/unnamed/PlayerKnockBackEvent.scala
+@@ -0,0 +1,8 @@
++package net.unnamed.event.unnamed
++
++import net.minecraft.network.play.server.S12PacketEntityVelocity
++import net.unnamed.event.CancelableEvent
++
++case class PlayerKnockBackEvent(packet: S12PacketEntityVelocity) extends CancelableEvent
++
++
+diff --git a/src/minecraft/net/unnamed/event/unnamed/ProbFromServerEvent.scala b/src/minecraft/net/unnamed/event/unnamed/ProbFromServerEvent.scala
+new file mode 100644
+index 0000000..5cdf4b2
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/unnamed/ProbFromServerEvent.scala
+@@ -0,0 +1,14 @@
++package net.unnamed.event.unnamed
++
++import net.unnamed.event.CancelableEvent
++import net.unnamed.event.unnamed.ServerProbes.Probe
++
++object ServerProbes extends Enumeration {
++  type Probe = Value
++
++  val TRANSACTION_PING, FILE_PROB_OUT_OF_RCPACK_FOLDER = Value
++}
++
++case class ProbeFromServerEvent(probeType: Probe, message: String = "") extends CancelableEvent
++
++
+diff --git a/src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala b/src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala
+new file mode 100644
+index 0000000..ee521f3
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala
+@@ -0,0 +1,34 @@
++package net.unnamed.event.unnamed
++
++import net.minecraft.network.play.client.C0FPacketConfirmTransaction
++import net.minecraft.network.play.server.{S12PacketEntityVelocity, S23PacketBlockChange, S32PacketConfirmTransaction}
++import net.unnamed.event.vanilla.PacketEvent
++import net.unnamed.event.{AlwaysActiveListener, EventBus}
++import net.unnamed.utils.common.interface.MinecraftInstance
++
++object UnnamedListeners extends MinecraftInstance {
++  {
++    EventBus +=
++      new AlwaysActiveListener[PacketEvent](
++        (event: PacketEvent) => event.packet match {
++
++          case velocityPacket: S12PacketEntityVelocity =>
++            if (velocityPacket.getEntityID == mc.thePlayer.getEntityId) {
++              val kbEvent = PlayerKnockBackEvent(velocityPacket)
++              EventBus.fireEvent(kbEvent)
++              if (kbEvent.isCanceled)
++                event.cancel()
++            }
++
++          case transactionPacket: S32PacketConfirmTransaction =>
++            EventBus.fireEvent(ProbeFromServerEvent(ServerProbes.TRANSACTION_PING,
++              s"Window id: ${transactionPacket.getWindowId}" +
++                s"Action Number: ${transactionPacket.getActionNumber}" +
++                s"Send C0FPacketConfirmTransaction: ${!transactionPacket.func_148888_e()}"))
++
++          case _ =>
++        })
++
++
++  }
++}
+diff --git a/src/minecraft/net/unnamed/event/vanilla/PacketEvent.scala b/src/minecraft/net/unnamed/event/vanilla/PacketEvent.scala
+new file mode 100644
+index 0000000..62d7d9c
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/vanilla/PacketEvent.scala
+@@ -0,0 +1,6 @@
++package net.unnamed.event.vanilla
++
++import net.minecraft.network.Packet
++import net.unnamed.event.CancelableEvent
++
++case class PacketEvent(packet: Packet[_]) extends CancelableEvent
+\ No newline at end of file
+diff --git a/src/minecraft/net/unnamed/event/vanilla/RenderEvent.scala b/src/minecraft/net/unnamed/event/vanilla/RenderEvent.scala
+new file mode 100644
+index 0000000..e928868
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/vanilla/RenderEvent.scala
+@@ -0,0 +1,6 @@
++package net.unnamed.event.vanilla
++
++import net.unnamed.event.Event
++
++case class Render3DEvent(partialTicks: Float) extends Event
++case class Render2DEvent(partialTicks: Float) extends Event
+diff --git a/src/minecraft/net/unnamed/event/vanilla/WorldEvent.scala b/src/minecraft/net/unnamed/event/vanilla/WorldEvent.scala
+new file mode 100644
+index 0000000..d2496f1
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/vanilla/WorldEvent.scala
+@@ -0,0 +1,6 @@
++package net.unnamed.event.vanilla
++
++import net.minecraft.client.multiplayer.WorldClient
++import net.unnamed.event.Event
++
++case class WorldEvent(worldClient: WorldClient) extends Event
+\ No newline at end of file
+diff --git a/src/minecraft/net/unnamed/modules/Module.scala b/src/minecraft/net/unnamed/modules/Module.scala
+new file mode 100644
+index 0000000..173d436
+--- /dev/null
++++ b/src/minecraft/net/unnamed/modules/Module.scala
+@@ -0,0 +1,45 @@
++package net.unnamed.modules
++
++import net.unnamed.event.unnamed.ModuleToggleEvent
++import net.unnamed.event.{Event, EventBus, Listener}
++import net.unnamed.utils.common.interface.{MinecraftInstance, Toggleable}
++
++import scala.reflect.ClassTag
++
++
++class Module(
++              val displayName: String = "Module Name",
++              val description: String = "As the name suggests"
++            ) extends Toggleable with MinecraftInstance {
++
++  {
++  }
++
++  def onEnable(): Unit = {}
++
++  def onDisable(): Unit = {}
++
++
++  override def onToggle(): Unit = {
++    if (mc.theWorld != null)
++      if (isOn)
++        onDisable()
++      else
++        onEnable()
++
++    EventBus.fireEvent(ModuleToggleEvent(this))
++  }
++
++  def onEvent[SubEvent <: Event](callbackFunc: SubEvent => Unit)(implicit tag: ClassTag[SubEvent]): Listener[SubEvent] = {
++    val listener = new Listener[SubEvent] {
++      override def isActive: Boolean = isOn && mc.theWorld != null
++
++      override def callback(event: SubEvent): Unit
++      = callbackFunc(event)
++    }
++
++    EventBus += listener
++
++    listener
++  }
++}
+\ No newline at end of file
+diff --git a/src/minecraft/net/unnamed/modules/Modules.scala b/src/minecraft/net/unnamed/modules/Modules.scala
+new file mode 100644
+index 0000000..97343b1
+--- /dev/null
++++ b/src/minecraft/net/unnamed/modules/Modules.scala
+@@ -0,0 +1,29 @@
++package net.unnamed.modules
++
++import net.unnamed.event.vanilla.WorldEvent
++import net.unnamed.event.{Event, EventBus, Listener}
++import net.unnamed.modules.render.FullBright
++
++case object Modules {
++  var modules: List[Module] = Nil
++
++
++  {
++    modules ::= FullBright
++
++
++    // TODO: load modules config and enable on world join
++    EventBus += new Listener[WorldEvent]() {
++      override def isActive: Boolean = true
++
++      override def callback(event: WorldEvent): Unit = {
++        if (event.worldClient != null)
++          modules.foreach((module: Module) => if (module.isOn) module.onEnable())
++        else
++          modules.foreach((module: Module) => if (!module.isOn) module.onDisable())
++      }
++    }
++  }
++
++  // TODO: mutex
++}
+diff --git a/src/minecraft/net/unnamed/modules/render/FullBright.scala b/src/minecraft/net/unnamed/modules/render/FullBright.scala
+new file mode 100644
+index 0000000..9a33548
+--- /dev/null
++++ b/src/minecraft/net/unnamed/modules/render/FullBright.scala
+@@ -0,0 +1,21 @@
++package net.unnamed.modules.render
++
++import net.unnamed.modules.Module
++
++// TODO: somehow make default value the name of the class
++object FullBright extends Module(displayName = "FullBright") {
++  {
++    on()
++  }
++
++  var originalGama = 0f
++
++  override def onEnable(): Unit = {
++    originalGama = mc.gameSettings.gammaSetting
++    mc.gameSettings.gammaSetting = 100F
++  }
++
++  override def onDisable(): Unit = {
++    mc.gameSettings.gammaSetting = originalGama
++  }
++}
+diff --git a/src/minecraft/net/unnamed/utils/common/interface/MinecraftInstance.scala b/src/minecraft/net/unnamed/utils/common/interface/MinecraftInstance.scala
+new file mode 100644
+index 0000000..3d009a3
+--- /dev/null
++++ b/src/minecraft/net/unnamed/utils/common/interface/MinecraftInstance.scala
 @@ -0,0 +1,7 @@
-+package net.unnamed.utils
++package net.unnamed.utils.common.interface
 +
 +import net.minecraft.client.Minecraft
 +
 +trait MinecraftInstance {
 +  val mc: Minecraft = Minecraft.getMinecraft
++}
+diff --git a/src/minecraft/net/unnamed/utils/common/interface/Toggleable.scala b/src/minecraft/net/unnamed/utils/common/interface/Toggleable.scala
+new file mode 100644
+index 0000000..1f53051
+--- /dev/null
++++ b/src/minecraft/net/unnamed/utils/common/interface/Toggleable.scala
+@@ -0,0 +1,24 @@
++package net.unnamed.utils.common.interface
++
++trait Toggleable {
++  private var isActive: Boolean = false
++
++  def isOn: Boolean = isActive
++
++  def onToggle(): Unit = {}
++
++  def on(): Unit = {
++    if (!isActive)
++      toggle()
++  }
++
++  def off(): Unit = {
++    if (isActive)
++      toggle()
++  }
++
++  def toggle(): Unit = {
++    isActive = !isActive
++    onToggle()
++  }
 +}
