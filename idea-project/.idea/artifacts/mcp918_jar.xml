@@ -7,6 +7,17 @@
         <element id="dir-copy" path="$PROJECT_DIR$/../assets/minecraft-unpack/assets" />
         <element id="dir-copy" path="$PROJECT_DIR$/../mcp918/src/minecraft/assets" />
       </element>
+      <element id="extracted-dir" path="$PROJECT_DIR$/../assets/libs/asm-7.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../assets/libs/asm-analysis-7.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../assets/libs/asm-commons-7.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../assets/libs/asm-tree-7.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../assets/libs/asm-util-7.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../assets/libs/graal-sdk-22.0.0.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../assets/libs/icu4j-64.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../assets/libs/js-22.0.0.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../assets/libs/regex-22.0.0.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../assets/libs/truffle-api-22.0.0.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../assets/libs/vecmath-1.5.2.jar" path-in-jar="/" />
     </root>
   </artifact>
 </component>
