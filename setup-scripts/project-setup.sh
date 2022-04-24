@@ -24,7 +24,7 @@ cd ../mcp918
 for patch in ../patches/*
 do
     echo applying $patch
-    git apply $patch
+    git apply --reject --whitespace=fix $patch
     git add .
     git commit -m "$(basename $patch .patch)"
 done
