@@ -1,6 +1,16 @@
 # Unnamed Client
 A FOSS mcp hacked (ghost/automation is a priority) client for minecraft intended for at least half standard users.  
 ScriptApi and REPL in game is supported (Soon).  
+
+However, a Scala REPL run configuration was included in project files.
+simply run Scala REPL and type
+```
+import net.unnamed.utils.REPLHelper
+ 
+REPLHelper.startMinecraft()
+```
+will launch Minecraft and have the REPL stay available for you.
+
 Very different client base, have fun skidding.
 ## Building on *nix
 ### Prerequisites

@@ -1,0 +1,717 @@
+diff --git a/mcp918.iml b/mcp918.iml
+index f77ebaf..b40bf98 100644
+--- a/mcp918.iml
++++ b/mcp918.iml
+@@ -58,6 +58,7 @@
+     <orderEntry type="library" name="codecwav-20101023" level="project" />
+     <orderEntry type="library" name="commons-codec-1.9" level="project" />
+     <orderEntry type="library" name="log4j-core-2.0-beta9" level="project" />
+-    <orderEntry type="library" name="javax.vecmath" level="project" />
++    <orderEntry type="library" exported="" name="javax.vecmath" level="project" />
++    <orderEntry type="library" exported="" name="graalvm.js" level="project" />
+   </component>
+ </module>
+\ No newline at end of file
+diff --git a/src/minecraft/META-INF/MANIFEST.MF b/src/minecraft/META-INF/MANIFEST.MF
+new file mode 100644
+index 0000000..7f36481
+--- /dev/null
++++ b/src/minecraft/META-INF/MANIFEST.MF
+@@ -0,0 +1,3 @@
++Manifest-Version: 1.0
++Main-Class: Start
++
+diff --git a/src/minecraft/net/minecraft/client/Minecraft.java b/src/minecraft/net/minecraft/client/Minecraft.java
+index 795b08a..0b431b7 100644
+--- a/src/minecraft/net/minecraft/client/Minecraft.java
++++ b/src/minecraft/net/minecraft/client/Minecraft.java
+@@ -169,6 +169,8 @@ import net.minecraft.world.storage.ISaveHandler;
+ import net.minecraft.world.storage.WorldInfo;
+ import net.unnamed.Unnamed;
+ import net.unnamed.event.EventBus;
++import net.unnamed.event.vanilla.ClientShutDownEvent;
++import net.unnamed.event.vanilla.CurrentGUIScreenUpdateEvent;
+ import net.unnamed.event.vanilla.WorldEvent;
+ import org.apache.commons.io.IOUtils;
+ import org.apache.commons.lang3.Validate;
+@@ -988,6 +990,12 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+             this.ingameGUI.getChatGUI().clearChatMessages();
+         }
+ 
++        CurrentGUIScreenUpdateEvent event = new CurrentGUIScreenUpdateEvent(guiScreenIn);
++        EventBus.fireEventJ(event);
++
++        if (event.isCanceled())
++            return;
++
+         this.currentScreen = (GuiScreen)guiScreenIn;
+ 
+         if (guiScreenIn != null)
+@@ -1116,6 +1124,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+         this.mcProfiler.startSection("display");
+         GlStateManager.enableTexture2D();
+ 
++        // TODO: inject here
+         if (this.thePlayer != null && this.thePlayer.isEntityInsideOpaqueBlock())
+         {
+             this.gameSettings.thirdPersonView = 0;
+@@ -1426,7 +1435,9 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+      */
+     public void shutdown()
+     {
+-        this.running = false;
++        ClientShutDownEvent event = new ClientShutDownEvent();
++        EventBus.fireEventJ(event);
++        this.running = event.isCanceled();
+     }
+ 
+     /**
+diff --git a/src/minecraft/net/unnamed/Unnamed.scala b/src/minecraft/net/unnamed/Unnamed.scala
+index 1cc8d1e..14756e0 100644
+--- a/src/minecraft/net/unnamed/Unnamed.scala
++++ b/src/minecraft/net/unnamed/Unnamed.scala
+@@ -1,8 +1,9 @@
+ package net.unnamed
+ 
+ import net.unnamed.event.EventBus
+-import net.unnamed.event.unnamed.UnnamedListeners
++import net.unnamed.event.unnamed.UnnamedEventsGen
+ import net.unnamed.modules.Modules
++import net.unnamed.settings.Settings
+ 
+ object Unnamed {
+   val name = "unnamed"
+@@ -11,8 +12,10 @@ object Unnamed {
+   val eventBus: EventBus.type = EventBus
+ 
+   val launch: Unit = {
+-    UnnamedListeners
++    UnnamedEventsGen
+     Modules
+-
++    Settings
++    Settings.loadSettings()
++    Settings.changeActiveLocalSetting()
+   }
+ }
+diff --git a/src/minecraft/net/unnamed/antiexploit/AntiScanFromResourcePackConfirm.scala b/src/minecraft/net/unnamed/antiexploit/AntiScanFromResourcePackConfirm.scala
+index 7a83f5d..2f9cbda 100644
+--- a/src/minecraft/net/unnamed/antiexploit/AntiScanFromResourcePackConfirm.scala
++++ b/src/minecraft/net/unnamed/antiexploit/AntiScanFromResourcePackConfirm.scala
+@@ -1,6 +1,6 @@
+ package net.unnamed.antiexploit
+ 
+-import net.unnamed.utils.common.interface.Toggleable
++import net.unnamed.utils.common.ifce.Toggleable
+ 
+ object AntiScanFromResourcePackConfirm extends Toggleable {
+   {
+diff --git a/src/minecraft/net/unnamed/cheats/packet/modification/Velocity.scala b/src/minecraft/net/unnamed/cheats/packet/modification/Velocity.scala
+index 369d758..afae799 100644
+--- a/src/minecraft/net/unnamed/cheats/packet/modification/Velocity.scala
++++ b/src/minecraft/net/unnamed/cheats/packet/modification/Velocity.scala
+@@ -1,7 +1,7 @@
+ package net.unnamed.cheats.packet.modification
+ 
+ import net.unnamed.event.unnamed.PlayerKnockBackEvent
+-import net.unnamed.utils.common.interface.MinecraftInstance
++import net.unnamed.utils.common.ifce.MinecraftInstance
+ 
+ import javax.vecmath.Vector2d
+ 
+diff --git a/src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala b/src/minecraft/net/unnamed/event/unnamed/UnnamedEventsGen.scala
+similarity index 84%
+rename from src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala
+rename to src/minecraft/net/unnamed/event/unnamed/UnnamedEventsGen.scala
+index ee521f3..b7b9cc0 100644
+--- a/src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala
++++ b/src/minecraft/net/unnamed/event/unnamed/UnnamedEventsGen.scala
+@@ -4,9 +4,9 @@ import net.minecraft.network.play.client.C0FPacketConfirmTransaction
+ import net.minecraft.network.play.server.{S12PacketEntityVelocity, S23PacketBlockChange, S32PacketConfirmTransaction}
+ import net.unnamed.event.vanilla.PacketEvent
+ import net.unnamed.event.{AlwaysActiveListener, EventBus}
+-import net.unnamed.utils.common.interface.MinecraftInstance
++import net.unnamed.utils.common.ifce.MinecraftInstance
+ 
+-object UnnamedListeners extends MinecraftInstance {
++object UnnamedEventsGen extends MinecraftInstance {
+   {
+     EventBus +=
+       new AlwaysActiveListener[PacketEvent](
+@@ -24,7 +24,7 @@ object UnnamedListeners extends MinecraftInstance {
+             EventBus.fireEvent(ProbeFromServerEvent(ServerProbes.TRANSACTION_PING,
+               s"Window id: ${transactionPacket.getWindowId}" +
+                 s"Action Number: ${transactionPacket.getActionNumber}" +
+-                s"Send C0FPacketConfirmTransaction: ${!transactionPacket.func_148888_e()}"))
++                s"Should Send C0FPacketConfirmTransaction: ${!transactionPacket.func_148888_e()}"))
+ 
+           case _ =>
+         })
+diff --git a/src/minecraft/net/unnamed/event/vanilla/ClientShutDownEvent.scala b/src/minecraft/net/unnamed/event/vanilla/ClientShutDownEvent.scala
+new file mode 100644
+index 0000000..66d3169
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/vanilla/ClientShutDownEvent.scala
+@@ -0,0 +1,5 @@
++package net.unnamed.event.vanilla
++
++import net.unnamed.event.CancelableEvent
++
++case class ClientShutDownEvent() extends CancelableEvent
+diff --git a/src/minecraft/net/unnamed/event/vanilla/CurrentGUIScreenUpdateEvent.scala b/src/minecraft/net/unnamed/event/vanilla/CurrentGUIScreenUpdateEvent.scala
+new file mode 100644
+index 0000000..e75382d
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/vanilla/CurrentGUIScreenUpdateEvent.scala
+@@ -0,0 +1,6 @@
++package net.unnamed.event.vanilla
++
++import net.minecraft.client.gui.GuiScreen
++import net.unnamed.event.CancelableEvent
++
++case class CurrentGUIScreenUpdateEvent(newScreen: GuiScreen) extends CancelableEvent
+diff --git a/src/minecraft/net/unnamed/modules/Module.scala b/src/minecraft/net/unnamed/modules/Module.scala
+index 173d436..1beded4 100644
+--- a/src/minecraft/net/unnamed/modules/Module.scala
++++ b/src/minecraft/net/unnamed/modules/Module.scala
+@@ -2,30 +2,57 @@ package net.unnamed.modules
+ 
+ import net.unnamed.event.unnamed.ModuleToggleEvent
+ import net.unnamed.event.{Event, EventBus, Listener}
+-import net.unnamed.utils.common.interface.{MinecraftInstance, Toggleable}
++import net.unnamed.settings.Settings.ISaveLocal
++import net.unnamed.settings.setting.SaveThisAlso
++import net.unnamed.utils.common.ifce.{MinecraftInstance, Toggleable}
+ 
+ import scala.reflect.ClassTag
+ 
+ 
+ class Module(
+-              val displayName: String = "Module Name",
+               val description: String = "As the name suggests"
+-            ) extends Toggleable with MinecraftInstance {
++            ) extends Toggleable with MinecraftInstance with ISaveLocal {
+ 
+   {
+   }
+ 
++  @SaveThisAlso
++  var state: Boolean = false
++
++  override def on(): Unit = {
++    if (!state)
++      toggle()
++  }
++
++  override def off(): Unit = {
++    if (state)
++      toggle()
++  }
++
++  override def toggle(): Unit = {
++    state = !state
++    onToggle()
++  }
++
++  override def isOn: Boolean = state
++
++
++  def moduleName(): String =
++    getClass.getSimpleName
++
+   def onEnable(): Unit = {}
+ 
+   def onDisable(): Unit = {}
+ 
+ 
+   override def onToggle(): Unit = {
+-    if (mc.theWorld != null)
+-      if (isOn)
+-        onDisable()
+-      else
+-        onEnable()
++    if (mc.theWorld == null)
++      return
++
++    if (isOn)
++      onEnable()
++    else
++      onDisable()
+ 
+     EventBus.fireEvent(ModuleToggleEvent(this))
+   }
+diff --git a/src/minecraft/net/unnamed/modules/Modules.scala b/src/minecraft/net/unnamed/modules/Modules.scala
+index 97343b1..37d7bad 100644
+--- a/src/minecraft/net/unnamed/modules/Modules.scala
++++ b/src/minecraft/net/unnamed/modules/Modules.scala
+@@ -1,8 +1,10 @@
+ package net.unnamed.modules
+ 
+-import net.unnamed.event.vanilla.WorldEvent
+-import net.unnamed.event.{Event, EventBus, Listener}
++import net.minecraft.client.gui.GuiIngameMenu
++import net.unnamed.event.vanilla.{CurrentGUIScreenUpdateEvent, WorldEvent}
++import net.unnamed.event.{AlwaysActiveListener, Event, EventBus, Listener}
+ import net.unnamed.modules.render.FullBright
++import net.unnamed.settings.Settings
+ 
+ case object Modules {
+   var modules: List[Module] = Nil
+@@ -13,16 +15,29 @@ case object Modules {
+ 
+ 
+     // TODO: load modules config and enable on world join
+-    EventBus += new Listener[WorldEvent]() {
+-      override def isActive: Boolean = true
+-
+-      override def callback(event: WorldEvent): Unit = {
++    EventBus +=
++      new AlwaysActiveListener[WorldEvent]((event: WorldEvent) => {
+         if (event.worldClient != null)
+-          modules.foreach((module: Module) => if (module.isOn) module.onEnable())
++          for (module <- modules) {
++
++            module.loadSetting()
++
++            if (module.isOn)
++              module.onEnable()
++          }
+         else
+-          modules.foreach((module: Module) => if (!module.isOn) module.onDisable())
+-      }
+-    }
++          for (module <- modules) {
++            if (module.isOn) module.onDisable()
++          }
++      }) +=
++      new AlwaysActiveListener[CurrentGUIScreenUpdateEvent]((event: CurrentGUIScreenUpdateEvent) => {
++        if (event.newScreen.isInstanceOf[GuiIngameMenu]) {
++          for (module <- modules)
++            module.saveSetting()
++
++          Settings.saveSettings()
++        }
++      })
+   }
+ 
+   // TODO: mutex
+diff --git a/src/minecraft/net/unnamed/modules/render/FullBright.scala b/src/minecraft/net/unnamed/modules/render/FullBright.scala
+index 9a33548..c619bcf 100644
+--- a/src/minecraft/net/unnamed/modules/render/FullBright.scala
++++ b/src/minecraft/net/unnamed/modules/render/FullBright.scala
+@@ -2,11 +2,7 @@ package net.unnamed.modules.render
+ 
+ import net.unnamed.modules.Module
+ 
+-// TODO: somehow make default value the name of the class
+-object FullBright extends Module(displayName = "FullBright") {
+-  {
+-    on()
+-  }
++object FullBright extends Module {
+ 
+   var originalGama = 0f
+ 
+diff --git a/src/minecraft/net/unnamed/settings/Settings.scala b/src/minecraft/net/unnamed/settings/Settings.scala
+new file mode 100644
+index 0000000..56a7041
+--- /dev/null
++++ b/src/minecraft/net/unnamed/settings/Settings.scala
+@@ -0,0 +1,224 @@
++package net.unnamed.settings
++
++import com.google.gson._
++import com.google.gson.annotations.Expose
++import net.unnamed.Unnamed
++import net.unnamed.event.vanilla.ClientShutDownEvent
++import net.unnamed.event.{AlwaysActiveListener, EventBus}
++import net.unnamed.settings.setting.{SaveThisAlso, Setting}
++import net.unnamed.utils.ReflectionUtils
++import net.unnamed.utils.common.ifce.MinecraftInstance
++
++import java.io.{BufferedReader, File, FileReader, FileWriter}
++import java.lang.reflect.Field
++import java.util.Map
++import scala.collection.convert.ImplicitConversions._
++import scala.collection.mutable
++
++object Settings extends MinecraftInstance {
++
++  {
++    EventBus += new AlwaysActiveListener[ClientShutDownEvent]((_: ClientShutDownEvent) => saveSettings())
++  }
++
++
++  val settingsDirectory = new File(mc.mcDataDir, Unnamed.name)
++  val globalSettings: mutable.Map[String, List[ISaveGlobal]] = new mutable.HashMap[String, List[ISaveGlobal]]().withDefaultValue(Nil)
++
++  var activeDirectory = new File(settingsDirectory, "default")
++  var activeSettings: mutable.Map[String, List[ISaveLocal]] = new mutable.HashMap[String, List[ISaveLocal]]().withDefaultValue(Nil)
++
++  val serializer: Gson = new GsonBuilder()
++    .excludeFieldsWithoutExposeAnnotation()
++    .create()
++
++  val parser = new JsonParser()
++
++  trait ISave {
++    val settingName: String = getClass.getSimpleName
++    val locatedPackage: Package = getClass.getPackage
++
++    var settings = new JsonArray
++
++    def loadSetting(): Unit = {
++      for (jsonElement <- settings) {
++
++        val jsonObject = jsonElement.getAsJsonObject
++        jsonObject.entrySet().foreach((value: Map.Entry[String, JsonElement]) => {
++
++          val settingField = ReflectionUtils.getAllField(this)
++            .find((field: Field) => field.getName == value.getKey)
++            .orNull
++
++          if (!settingField.isAccessible)
++            settingField.setAccessible(true)
++
++          val originalSetting = settingField.get(this)
++          val deserializedSetting = serializer.fromJson(value.getValue, originalSetting.getClass)
++
++          ReflectionUtils.getAllField(deserializedSetting).foreach((field: Field) => {
++
++            if (!field.isAnnotationPresent(classOf[Expose]))
++              return
++
++            if (!field.isAccessible)
++              field.setAccessible(true)
++
++            field.set(field.get(deserializedSetting), originalSetting)
++          })
++        })
++      }
++    }
++
++    def saveSetting(): Unit = {
++      settings = new JsonArray
++      ReflectionUtils.getAllField(this).filter((field: Field) => {
++        if (!field.isAccessible)
++          field.setAccessible(true)
++
++        field.getClass.isAssignableFrom(classOf[Setting[_]]) ||
++          field.isAnnotationPresent(classOf[SaveThisAlso])
++      }
++      )
++        .foreach((field: Field) => {
++
++          val setting = field.get(this)
++
++          val jsonObject = new JsonObject
++          jsonObject.add(field.getName, parser.parse(serializer.toJson(setting)))
++          settings.add(jsonObject)
++        })
++
++    }
++
++    def getConfigFileName: String =
++      locatedPackage.getName + ".json"
++  }
++
++  trait ISaveLocal extends ISave {
++
++    {
++      activeSettings(getConfigFileName) ::= this
++    }
++
++  }
++
++  trait ISaveGlobal extends ISave {
++
++    {
++      globalSettings(getConfigFileName) ::= this
++    }
++
++  }
++
++  def loadSettings(): Unit = {
++    if (!settingsDirectory.exists())
++      settingsDirectory.mkdir()
++
++    for (file <- settingsDirectory.listFiles()) {
++      if (file.isDirectory)
++        return
++
++      val settingFileName = file.getName
++
++      val fileContent = parser.parse(new BufferedReader(new FileReader(file)))
++      for (element <- fileContent.getAsJsonArray) {
++        val jsonObject = element.getAsJsonObject
++
++        val save = globalSettings(settingFileName).find((global: ISaveGlobal) =>
++          global.settingName == jsonObject.get("settingName").getAsString)
++
++        if (save.isDefined)
++          save.get.settings = jsonObject.get("settings").getAsJsonArray
++
++      }
++
++    }
++  }
++
++  def changeActiveLocalSetting(settingName: String = "default"): Unit = {
++    activeDirectory = new File(settingsDirectory, settingName)
++
++
++    if (!activeDirectory.exists())
++      activeDirectory.mkdir()
++
++    for (file <- activeDirectory.listFiles()) {
++      val settingFileName = file.getName
++
++      val fileContent = parser.parse(new BufferedReader(new FileReader(file)))
++      for (element <- fileContent.getAsJsonArray) {
++        val jsonObject = element.getAsJsonObject
++
++        val save = activeSettings(settingFileName).find((global: ISaveLocal) =>
++          global.settingName == jsonObject.get("settingName").getAsString)
++
++        if (save.isDefined)
++          save.get.settings = jsonObject.get("settings").getAsJsonArray
++
++      }
++
++    }
++  }
++
++  def saveSettings(): Unit = {
++
++    globalSettings.foreachEntry((_: String, value: List[ISave]) =>
++      for (save <- value)
++        save.saveSetting())
++
++    activeSettings.foreachEntry((_: String, value: List[ISave]) =>
++      for (save <- value)
++        save.saveSetting())
++
++    if (!settingsDirectory.exists())
++      settingsDirectory.mkdir()
++
++    if (!activeDirectory.exists())
++      activeDirectory.mkdir()
++
++    globalSettings.foreachEntry((fileName: String, saves: List[ISaveGlobal]) => {
++      val file = new File(settingsDirectory, fileName)
++      if (!file.exists())
++        file.createNewFile()
++
++      val jsonArray = new JsonArray
++      for (save <- saves) {
++        val jsonObject = new JsonObject
++
++        jsonObject.addProperty("settingName", save.settingName)
++        jsonObject.add("settings", save.settings)
++
++        jsonArray.add(jsonObject)
++      }
++
++      val writer = new FileWriter(file)
++      writer.write(serializer.toJson(jsonArray))
++      writer.close()
++    })
++
++
++    activeSettings.foreachEntry((fileName: String, saves: List[ISaveLocal]) => {
++      val file = new File(activeDirectory, fileName)
++      if (!file.exists())
++        file.createNewFile()
++
++      val jsonArray = new JsonArray
++      for (save <- saves) {
++        val jsonObject = new JsonObject
++        jsonObject.addProperty("settingName", save.settingName)
++        jsonObject.add("settings", save.settings)
++
++        jsonArray.add(jsonObject)
++      }
++
++
++      val writer = new FileWriter(file)
++      writer.write(serializer.toJson(jsonArray))
++      writer.close()
++    })
++
++  }
++
++}
++
+diff --git a/src/minecraft/net/unnamed/settings/setting/SaveThisAlso.java b/src/minecraft/net/unnamed/settings/setting/SaveThisAlso.java
+new file mode 100644
+index 0000000..6126d40
+--- /dev/null
++++ b/src/minecraft/net/unnamed/settings/setting/SaveThisAlso.java
+@@ -0,0 +1,11 @@
++package net.unnamed.settings.setting;
++
++import java.lang.annotation.ElementType;
++import java.lang.annotation.Retention;
++import java.lang.annotation.RetentionPolicy;
++import java.lang.annotation.Target;
++
++@Target(ElementType.FIELD)
++@Retention(RetentionPolicy.RUNTIME)
++public @interface SaveThisAlso {
++}
+diff --git a/src/minecraft/net/unnamed/settings/setting/Setting.scala b/src/minecraft/net/unnamed/settings/setting/Setting.scala
+new file mode 100644
+index 0000000..e5282ad
+--- /dev/null
++++ b/src/minecraft/net/unnamed/settings/setting/Setting.scala
+@@ -0,0 +1,73 @@
++package net.unnamed.settings.setting
++
++import com.google.gson.annotations.Expose
++
++trait Setting[T] {
++  // TODO: integrate with internal REPL (that doesn't exist yet)
++  @Expose
++  var expr: Option[String] = None
++
++  def getValue: T
++
++  def get: T = {
++    //    if (expr.isDefined)
++    //      eval(expr)
++    //    else
++    getValue
++  }
++
++  def set(value: T): Unit
++
++  def suggestedValue: String
++}
++
++class BoolSetting(
++                   @Expose
++                   private var on: Boolean,
++                   private val default: Boolean = false) extends Setting[Boolean] {
++  override def set(value: Boolean): Unit =
++    on = value
++
++  override def getValue: Boolean = on
++
++  override def suggestedValue: String = default.toString
++}
++
++class IntegerSetting(
++                      @Expose
++                      private var number: Int,
++                      private val suggestedLower: Int = 0,
++                      private val suggestedHigher: Int = 1) extends Setting[Int] {
++  override def getValue: Int = number
++
++  override def set(value: Int): Unit =
++    number = value
++
++  override def suggestedValue: String = s"[$suggestedLower, $suggestedHigher]"
++}
++
++
++class FloatSetting(
++                    @Expose
++                    private var number: Float,
++                    private val suggestedLower: Float = 0,
++                    private val suggestedHigher: Float = 1) extends Setting[Float] {
++  override def getValue: Float = number
++
++  override def set(value: Float): Unit =
++    number = value
++
++  override def suggestedValue: String = s"[$suggestedLower, $suggestedHigher]"
++}
++
++class ListSetting(
++                   @Expose
++                   private var choice: String,
++                   private val suggestedList: List[String] = Nil) extends Setting[String] {
++  override def getValue: String = choice
++
++  override def set(value: String): Unit =
++    choice = value
++
++  override def suggestedValue: String = suggestedList.toString()
++}
+\ No newline at end of file
+diff --git a/src/minecraft/net/unnamed/utils/REPLHelper.scala b/src/minecraft/net/unnamed/utils/REPLHelper.scala
+new file mode 100644
+index 0000000..82bb1a4
+--- /dev/null
++++ b/src/minecraft/net/unnamed/utils/REPLHelper.scala
+@@ -0,0 +1,20 @@
++package net.unnamed.utils
++
++import net.minecraft.client.main.Main
++
++object REPLHelper {
++  def startMinecraft(args: Array[String] = Array("--username", "Unnamed")): Unit = {
++
++    new Thread() {
++      override def run(): Unit = {
++        Main.main(Array(
++          "--version", "mcp",
++          "--accessToken", "0",
++          "--assetsDir", "assets",
++          "--assetIndex", "1.8",
++          "--userProperties", "{}",
++        ) ++ args)
++      }
++    }.start()
++  }
++}
+diff --git a/src/minecraft/net/unnamed/utils/ReflectionUtils.scala b/src/minecraft/net/unnamed/utils/ReflectionUtils.scala
+new file mode 100644
+index 0000000..d125734
+--- /dev/null
++++ b/src/minecraft/net/unnamed/utils/ReflectionUtils.scala
+@@ -0,0 +1,18 @@
++package net.unnamed.utils
++
++import java.lang.reflect.Field
++
++case object ReflectionUtils {
++  def getAllField(obj: Object): List[Field] = {
++    var fields: List[Field] = Nil
++
++    var clazz: Class[_] = obj.getClass
++
++    while (clazz != classOf[Object]) {
++      fields ++= clazz.getDeclaredFields
++      clazz = clazz.getSuperclass
++    }
++
++    fields
++  }
++}
+diff --git a/src/minecraft/net/unnamed/utils/common/interface/MinecraftInstance.scala b/src/minecraft/net/unnamed/utils/common/ifce/MinecraftInstance.scala
+similarity index 72%
+rename from src/minecraft/net/unnamed/utils/common/interface/MinecraftInstance.scala
+rename to src/minecraft/net/unnamed/utils/common/ifce/MinecraftInstance.scala
+index 3d009a3..0a8561f 100644
+--- a/src/minecraft/net/unnamed/utils/common/interface/MinecraftInstance.scala
++++ b/src/minecraft/net/unnamed/utils/common/ifce/MinecraftInstance.scala
+@@ -1,4 +1,4 @@
+-package net.unnamed.utils.common.interface
++package net.unnamed.utils.common.ifce
+ 
+ import net.minecraft.client.Minecraft
+ 
+diff --git a/src/minecraft/net/unnamed/utils/common/interface/Toggleable.scala b/src/minecraft/net/unnamed/utils/common/ifce/Toggleable.scala
+similarity index 87%
+rename from src/minecraft/net/unnamed/utils/common/interface/Toggleable.scala
+rename to src/minecraft/net/unnamed/utils/common/ifce/Toggleable.scala
+index 1f53051..f169657 100644
+--- a/src/minecraft/net/unnamed/utils/common/interface/Toggleable.scala
++++ b/src/minecraft/net/unnamed/utils/common/ifce/Toggleable.scala
+@@ -1,4 +1,4 @@
+-package net.unnamed.utils.common.interface
++package net.unnamed.utils.common.ifce
+ 
+ trait Toggleable {
+   private var isActive: Boolean = false

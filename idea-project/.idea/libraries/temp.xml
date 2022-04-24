@@ -8,6 +8,8 @@
       <root url="jar://$PROJECT_DIR$/../mcp918/temp/minecraft_rg.jar!/" />
     </CLASSES>
     <JAVADOC />
-    <SOURCES />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/../mcp918/temp/minecraft_ff_out.jar!/" />
+    </SOURCES>
   </library>
 </component>
