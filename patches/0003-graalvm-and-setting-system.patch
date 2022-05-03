@@ -158,62 +158,6 @@ index ea32192..09b0d0b 100644
      public void handlePlayerAbilities(S39PacketPlayerAbilities packetIn)
      {
          PacketThreadUtil.checkThreadAndEnqueue(packetIn, this, this.gameController);
-diff --git a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$1.java b/src/minecraft/net/minecraft/client/renderer/EntityRenderer$1.java
-deleted file mode 100644
-index 1171b90..0000000
---- a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$1.java
-+++ /dev/null
-@@ -1,24 +0,0 @@
--package net.minecraft.client.renderer;
--
--import com.google.common.base.Predicate;
--import net.minecraft.entity.Entity;
--
--class EntityRenderer$1 implements Predicate
--{
--    final EntityRenderer field_90032_a;
--
--    EntityRenderer$1(EntityRenderer p_i1243_1_)
--    {
--        this.field_90032_a = p_i1243_1_;
--    }
--
--    public boolean apply(Entity p_apply_1_)
--    {
--        return p_apply_1_.canBeCollidedWith();
--    }
--
--    public boolean apply(Object p_apply_1_)
--    {
--        return this.apply((Entity)p_apply_1_);
--    }
--}
-diff --git a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$2.java b/src/minecraft/net/minecraft/client/renderer/EntityRenderer$2.java
-deleted file mode 100644
-index a3c979a..0000000
---- a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$2.java
-+++ /dev/null
-@@ -1,20 +0,0 @@
--package net.minecraft.client.renderer;
--
--import java.util.concurrent.Callable;
--import net.minecraft.client.Minecraft;
--
--class EntityRenderer$2 implements Callable
--{
--    final EntityRenderer field_90025_c;
--    private static final String __OBFID = "CL_00000948";
--
--    EntityRenderer$2(EntityRenderer p_i46419_1_)
--    {
--        this.field_90025_c = p_i46419_1_;
--    }
--
--    public String call() throws Exception
--    {
--        return Minecraft.getMinecraft().currentScreen.getClass().getCanonicalName();
--    }
--}
 diff --git a/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java b/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java
 index 50c3a3b..debd63d 100644
 --- a/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java
@@ -352,6 +296,49 @@ index 50c3a3b..debd63d 100644
              boolean flag = entity instanceof EntityPlayer && !this.mc.gameSettings.hideGUI;
  
              if (flag && !((EntityPlayer)entity).capabilities.allowEdit)
+diff --git a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$2.java b/src/minecraft/net/minecraft/client/renderer/EntityRendererCallable.java
+similarity index 79%
+rename from src/minecraft/net/minecraft/client/renderer/EntityRenderer$2.java
+rename to src/minecraft/net/minecraft/client/renderer/EntityRendererCallable.java
+index a3c979a..39e4788 100644
+--- a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$2.java
++++ b/src/minecraft/net/minecraft/client/renderer/EntityRendererCallable.java
+@@ -3,12 +3,12 @@ package net.minecraft.client.renderer;
+ import java.util.concurrent.Callable;
+ import net.minecraft.client.Minecraft;
+ 
+-class EntityRenderer$2 implements Callable
++class EntityRendererCallable implements Callable
+ {
+     final EntityRenderer field_90025_c;
+     private static final String __OBFID = "CL_00000948";
+ 
+-    EntityRenderer$2(EntityRenderer p_i46419_1_)
++    EntityRendererCallable(EntityRenderer p_i46419_1_)
+     {
+         this.field_90025_c = p_i46419_1_;
+     }
+diff --git a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$1.java b/src/minecraft/net/minecraft/client/renderer/EntityRendererPred.java
+similarity index 81%
+rename from src/minecraft/net/minecraft/client/renderer/EntityRenderer$1.java
+rename to src/minecraft/net/minecraft/client/renderer/EntityRendererPred.java
+index 1171b90..47c283c 100644
+--- a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$1.java
++++ b/src/minecraft/net/minecraft/client/renderer/EntityRendererPred.java
+@@ -3,11 +3,11 @@ package net.minecraft.client.renderer;
+ import com.google.common.base.Predicate;
+ import net.minecraft.entity.Entity;
+ 
+-class EntityRenderer$1 implements Predicate
++class EntityRendererPred implements Predicate
+ {
+     final EntityRenderer field_90032_a;
+ 
+-    EntityRenderer$1(EntityRenderer p_i1243_1_)
++    EntityRendererPred(EntityRenderer p_i1243_1_)
+     {
+         this.field_90032_a = p_i1243_1_;
+     }
 diff --git a/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java b/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java
 index 1ac5166..e3ba7ac 100644
 --- a/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java
@@ -493,18 +480,45 @@ index 369d758..bd77127 100644
      val packet = event.packet
  
      packet.motionY = (packet.motionY * byVertical).toInt
-diff --git a/src/minecraft/net/unnamed/event/unnamed/PlayerKnockBackEvent.scala b/src/minecraft/net/unnamed/event/unnamed/PlayerKnockBackEvent.scala
-deleted file mode 100644
-index 8e7fe18..0000000
+diff --git a/src/minecraft/net/unnamed/event/EventAlias.scala b/src/minecraft/net/unnamed/event/EventAlias.scala
+new file mode 100644
+index 0000000..0c0c8a3
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/EventAlias.scala
+@@ -0,0 +1,7 @@
++package net.unnamed.event
++
++import net.unnamed.event.unnamed.PlayerMovementCalculatePreEvent
++
++case object EventAlias {
++  type StrafeEvent = PlayerMovementCalculatePreEvent
++}
+diff --git a/src/minecraft/net/unnamed/event/unnamed/PlayerKnockBackEvent.scala b/src/minecraft/net/unnamed/event/unnamed/PlayerGotKnockedBackEvent.scala
+similarity index 60%
+rename from src/minecraft/net/unnamed/event/unnamed/PlayerKnockBackEvent.scala
+rename to src/minecraft/net/unnamed/event/unnamed/PlayerGotKnockedBackEvent.scala
+index 8e7fe18..867667b 100644
 --- a/src/minecraft/net/unnamed/event/unnamed/PlayerKnockBackEvent.scala
-+++ /dev/null
-@@ -1,6 +0,0 @@
--package net.unnamed.event.unnamed
--
--import net.minecraft.network.play.server.S12PacketEntityVelocity
--import net.unnamed.event.CancelableEvent
--
++++ b/src/minecraft/net/unnamed/event/unnamed/PlayerGotKnockedBackEvent.scala
+@@ -3,4 +3,4 @@ package net.unnamed.event.unnamed
+ import net.minecraft.network.play.server.S12PacketEntityVelocity
+ import net.unnamed.event.CancelableEvent
+ 
 -case class PlayerKnockBackEvent(packet: S12PacketEntityVelocity) extends CancelableEvent
++case class PlayerGotKnockedBackEvent(packet: S12PacketEntityVelocity) extends CancelableEvent
+diff --git a/src/minecraft/net/unnamed/event/unnamed/PlayerMovementCalculatePreEvent.scala b/src/minecraft/net/unnamed/event/unnamed/PlayerMovementCalculatePreEvent.scala
+new file mode 100644
+index 0000000..bba1db6
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/unnamed/PlayerMovementCalculatePreEvent.scala
+@@ -0,0 +1,7 @@
++package net.unnamed.event.unnamed
++
++import net.unnamed.event.CancelableEvent
++
++case class PlayerMovementCalculatePreEvent(var forward: java.lang.Float,
++                                           var strafe: java.lang.Float,
++                                           var friction: java.lang.Float) extends CancelableEvent
 diff --git a/src/minecraft/net/unnamed/event/unnamed/UnnamedEventsGen.scala b/src/minecraft/net/unnamed/event/unnamed/UnnamedEventsGen.scala
 new file mode 100644
 index 0000000..c26f6b1
@@ -620,6 +634,22 @@ index 0000000..e75382d
 +import net.unnamed.event.CancelableEvent
 +
 +case class CurrentGUIScreenUpdateEvent(newScreen: GuiScreen) extends CancelableEvent
+diff --git a/src/minecraft/net/unnamed/event/vanilla/MovementCalculatePreEvent.scala b/src/minecraft/net/unnamed/event/vanilla/MovementCalculatePreEvent.scala
+new file mode 100644
+index 0000000..3973c83
+--- /dev/null
++++ b/src/minecraft/net/unnamed/event/vanilla/MovementCalculatePreEvent.scala
+@@ -0,0 +1,10 @@
++package net.unnamed.event.vanilla
++
++import net.minecraft.entity.Entity
++import net.unnamed.event.CancelableEvent
++
++case class MovementCalculatePreEvent(entity: Entity,
++                                     var forward: java.lang.Float,
++                                     var strafe: java.lang.Float,
++                                     var friction: java.lang.Float) extends CancelableEvent
++
 diff --git a/src/minecraft/net/unnamed/modules/Module.scala b/src/minecraft/net/unnamed/modules/Module.scala
 index 173d436..1881b6f 100644
 --- a/src/minecraft/net/unnamed/modules/Module.scala
@@ -754,6 +784,47 @@ index 97343b1..a990c93 100644
    }
  
    // TODO: mutex
+diff --git a/src/minecraft/net/unnamed/modules/antiexploit/AntiScanFromResourcePackConfirm.scala b/src/minecraft/net/unnamed/modules/antiexploit/AntiScanFromResourcePackConfirm.scala
+new file mode 100644
+index 0000000..f444d18
+--- /dev/null
++++ b/src/minecraft/net/unnamed/modules/antiexploit/AntiScanFromResourcePackConfirm.scala
+@@ -0,0 +1,5 @@
++package net.unnamed.modules.antiexploit
++
++import net.unnamed.modules.Module
++
++object AntiScanFromResourcePackConfirm extends Module
+\ No newline at end of file
+diff --git a/src/minecraft/net/unnamed/modules/render/FreeCam.scala b/src/minecraft/net/unnamed/modules/render/FreeCam.scala
+new file mode 100644
+index 0000000..123f1e7
+--- /dev/null
++++ b/src/minecraft/net/unnamed/modules/render/FreeCam.scala
+@@ -0,0 +1,22 @@
++package net.unnamed.modules.render
++
++import net.unnamed.modules.Module
++import net.unnamed.settings.setting.FloatSetting
++import net.unnamed.world.inputcontrol.{Cameras, FreeCamera}
++
++object FreeCam extends Module {
++
++  val flySpeed = new FloatSetting(.1f)
++
++  override val enableOnJoin: Boolean = false
++
++  override def onEnable(): Unit = {
++    val freeCam = new FreeCamera()
++    freeCam.capabilities.setFlySpeed(flySpeed.get)
++    clientSideWorld.cameras.setActiveCamera(Some(freeCam))
++  }
++
++  override def onDisable(): Unit = {
++    clientSideWorld.cameras.activeCamera = None
++  }
++}
+\ No newline at end of file
 diff --git a/src/minecraft/net/unnamed/modules/render/FullBright.scala b/src/minecraft/net/unnamed/modules/render/FullBright.scala
 index 9a33548..c619bcf 100644
 --- a/src/minecraft/net/unnamed/modules/render/FullBright.scala
@@ -1239,6 +1310,70 @@ index 0000000..0ac3c67
 +    classes
 +  }
 +}
+diff --git a/src/minecraft/net/unnamed/utils/Rotation.scala b/src/minecraft/net/unnamed/utils/Rotation.scala
+new file mode 100644
+index 0000000..5dee056
+--- /dev/null
++++ b/src/minecraft/net/unnamed/utils/Rotation.scala
+@@ -0,0 +1,43 @@
++package net.unnamed.utils
++
++import net.minecraft.client.settings.GameSettings
++import net.minecraft.entity.Entity
++import net.unnamed.utils.Rotation.getGCD
++import net.unnamed.utils.common.ifce.MinecraftInstance
++
++case class Rotation(rotationYaw: Float, rotationPitch: Float) {
++
++  def correctByGCD(GCD: Float, input: Float): Float = {
++    val mod = input % GCD
++    input - (if (mod < GCD / 2) mod else mod - GCD)
++  }
++
++  def add(deltaYaw: Float, deltaPitch: Float): Rotation = {
++    val GCD = getGCD
++
++    val correctedDeltaYaw = correctByGCD(GCD, deltaYaw)
++    val correctedDeltaPitch = correctByGCD(GCD, deltaPitch)
++
++    Rotation.apply(rotationYaw + correctedDeltaYaw, rotationPitch + correctedDeltaPitch)
++  }
++
++  def +(deltaYaw: Float, deltaPitch: Float): Rotation = {
++    add(deltaYaw, deltaPitch)
++  }
++
++  def to(entity: Entity): Unit = {
++    entity.rotationYaw = rotationYaw
++    entity.rotationPitch = rotationPitch
++  }
++}
++
++object Rotation extends MinecraftInstance {
++  def getGCD: Float = {
++    val f = mc.gameSettings.mouseSensitivity * 0.6F + 0.2F
++    f * f * f * 8.0F
++  }
++
++  def fromEntity(entity: Entity): Rotation = {
++    Rotation.apply(entity.rotationYaw, entity.rotationPitch)
++  }
++}
+\ No newline at end of file
+diff --git a/src/minecraft/net/unnamed/utils/common/ifce/ClientInstance.scala b/src/minecraft/net/unnamed/utils/common/ifce/ClientInstance.scala
+new file mode 100644
+index 0000000..b71f279
+--- /dev/null
++++ b/src/minecraft/net/unnamed/utils/common/ifce/ClientInstance.scala
+@@ -0,0 +1,8 @@
++package net.unnamed.utils.common.ifce
++
++import net.unnamed.Unnamed
++import net.unnamed.world.ClientSideWorld
++
++trait ClientInstance {
++  def clientSideWorld: ClientSideWorld = Unnamed.clientSideWorld.get
++}
 diff --git a/src/minecraft/net/unnamed/utils/common/interface/MinecraftInstance.scala b/src/minecraft/net/unnamed/utils/common/ifce/MinecraftInstance.scala
 similarity index 72%
 rename from src/minecraft/net/unnamed/utils/common/interface/MinecraftInstance.scala
@@ -1265,3 +1400,174 @@ index 1f53051..f169657 100644
  
  trait Toggleable {
    private var isActive: Boolean = false
+diff --git a/src/minecraft/net/unnamed/world/ClientSideWorld.scala b/src/minecraft/net/unnamed/world/ClientSideWorld.scala
+new file mode 100644
+index 0000000..eb36d69
+--- /dev/null
++++ b/src/minecraft/net/unnamed/world/ClientSideWorld.scala
+@@ -0,0 +1,18 @@
++package net.unnamed.world
++
++import net.minecraft.entity.Entity
++import net.minecraft.world.World
++import net.unnamed.utils.common.ifce.MinecraftInstance
++import net.unnamed.world.inputcontrol.Cameras
++
++class ClientSideWorld (val world: World) extends MinecraftInstance {
++
++  val cameras = new Cameras
++
++  var clientSideEntityId: Int = -1
++
++  def addClientEntity(entity: Entity): Unit = {
++    mc.theWorld.addEntityToWorld(clientSideEntityId, entity)
++    clientSideEntityId -= 1
++  }
++}
+diff --git a/src/minecraft/net/unnamed/world/inputcontrol/Cameras.scala b/src/minecraft/net/unnamed/world/inputcontrol/Cameras.scala
+new file mode 100644
+index 0000000..89c737e
+--- /dev/null
++++ b/src/minecraft/net/unnamed/world/inputcontrol/Cameras.scala
+@@ -0,0 +1,23 @@
++package net.unnamed.world.inputcontrol
++
++import net.minecraft.entity.Entity
++import net.unnamed.utils.common.ifce.MinecraftInstance
++
++class Cameras extends MinecraftInstance {
++  var cameras: List[Entity] = Nil
++
++  var activeCamera: Option[Entity] = None
++
++  def setActiveCamera(entity: Option[Entity]): Unit = {
++    if (entity.isDefined)
++      cameras ::= entity.get
++    activeCamera = entity
++  }
++
++  def getPlayerOrSupposedToBeViewEntity: Entity = {
++    if (activeCamera.isDefined)
++      mc.thePlayer
++    else
++      this.mc.getRenderViewEntity
++  }
++}
+diff --git a/src/minecraft/net/unnamed/world/inputcontrol/FreeCamera.scala b/src/minecraft/net/unnamed/world/inputcontrol/FreeCamera.scala
+new file mode 100644
+index 0000000..5daf135
+--- /dev/null
++++ b/src/minecraft/net/unnamed/world/inputcontrol/FreeCamera.scala
+@@ -0,0 +1,58 @@
++package net.unnamed.world.inputcontrol
++
++import net.minecraft.client.Minecraft
++import net.minecraft.entity.player.EntityPlayer
++import net.minecraft.util.MovementInputFromOptions
++import net.unnamed.Unnamed
++import net.unnamed.utils.common.ifce.{ClientInstance, MinecraftInstance}
++
++class FreeCamera
++  extends EntityPlayer(Minecraft.getMinecraft.theWorld,
++    Minecraft.getMinecraft.thePlayer.getGameProfile) with MinecraftInstance with ClientInstance{
++
++  {
++    clonePlayer(mc.thePlayer, true)
++    copyLocationAndAnglesFrom(mc.thePlayer)
++
++    Unnamed.clientSideWorld.get.addClientEntity(this)
++
++    noClip = true
++    capabilities.isFlying = true
++
++
++    setInvisible(true)
++  }
++
++  /**
++   * Returns whether the entity is in a server world
++   */
++  override def isServerWorld: Boolean = true
++
++  override def moveFlying(strafe: Float, forward: Float, friction: Float): Unit = {
++
++    var inputStrafe = strafe
++    var inputForward = forward
++
++    if (clientSideWorld.cameras.activeCamera.isDefined && clientSideWorld.cameras.activeCamera.get == this) {
++      val inputControl = new MovementInputFromOptions(mc.gameSettings)
++      inputControl.updatePlayerMoveState()
++
++      inputStrafe = inputControl.moveStrafe
++      inputForward = inputControl.moveForward
++
++
++      if (inputControl.sneak)
++        motionY -= capabilities.getFlySpeed * 3
++
++      if (inputControl.jump)
++        motionY += capabilities.getFlySpeed * 3
++    }
++
++    super.moveFlying(inputStrafe, inputForward, friction)
++  }
++
++  /**
++   * Returns true if the player is in spectator mode.
++   */
++  override def isSpectator: Boolean = false
++}
+diff --git a/src/minecraft/net/unnamed/world/inputcontrol/PlayerMovementControl.scala b/src/minecraft/net/unnamed/world/inputcontrol/PlayerMovementControl.scala
+new file mode 100644
+index 0000000..23661d4
+--- /dev/null
++++ b/src/minecraft/net/unnamed/world/inputcontrol/PlayerMovementControl.scala
+@@ -0,0 +1,21 @@
++package net.unnamed.world.inputcontrol
++
++import net.minecraft.client.settings.GameSettings
++import net.minecraft.util.MovementInputFromOptions
++import net.unnamed.world.schedule.Scheduler
++
++class PlayerMovementControl(val gameSettings: GameSettings) extends MovementInputFromOptions(gameSettings) {
++
++  override def updatePlayerMoveState(): Unit = {
++    if (Scheduler.isPlayerControlledByScheduler) {
++      val movementInput = Scheduler.getPlayerMovementInput
++      moveForward = movementInput.moveForward
++      moveStrafe = movementInput.moveStrafe
++      jump = movementInput.jump
++      sneak = movementInput.sneak
++      return
++    }
++
++    super.updatePlayerMoveState()
++  }
++}
+diff --git a/src/minecraft/net/unnamed/world/schedule/Scheduler.scala b/src/minecraft/net/unnamed/world/schedule/Scheduler.scala
+new file mode 100644
+index 0000000..10ae628
+--- /dev/null
++++ b/src/minecraft/net/unnamed/world/schedule/Scheduler.scala
+@@ -0,0 +1,21 @@
++package net.unnamed.world.schedule
++
++import net.minecraft.util.MovementInput
++import net.unnamed.utils.Rotation
++
++
++object Scheduler {
++
++
++  def isPlayerControlledByScheduler: Boolean = {
++    false
++  }
++
++  def getPlayerMovementInput: MovementInput = {
++    new MovementInput()
++  }
++
++  def getPlayerRotation: Rotation = {
++    Rotation.apply(0, 0)
++  }
++}
