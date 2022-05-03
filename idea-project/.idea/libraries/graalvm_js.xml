@@ -2,17 +2,17 @@
   <library name="graalvm.js" type="repository">
     <properties maven-id="org.graalvm.js:js:LATEST" />
     <CLASSES>
-      <root url="jar://$PROJECT_DIR$/../assets/libs/js-22.0.0.2.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/regex-22.0.0.2.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/truffle-api-22.0.0.2.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/graal-sdk-22.0.0.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/js-22.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/regex-22.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/truffle-api-22.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/graal-sdk-22.1.0.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES>
-      <root url="jar://$PROJECT_DIR$/../assets/libs/js-22.0.0.2-sources.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/regex-22.0.0.2-sources.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/truffle-api-22.0.0.2-sources.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/graal-sdk-22.0.0.2-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/js-22.1.0-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/regex-22.1.0-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/truffle-api-22.1.0-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/graal-sdk-22.1.0-sources.jar!/" />
     </SOURCES>
   </library>
 </component>

@@ -14,27 +14,37 @@ index f77ebaf..b40bf98 100644
 \ No newline at end of file
 diff --git a/src/minecraft/META-INF/MANIFEST.MF b/src/minecraft/META-INF/MANIFEST.MF
 new file mode 100644
-index 0000000..7f36481
+index 0000000..b3cc4af
 --- /dev/null
 +++ b/src/minecraft/META-INF/MANIFEST.MF
-@@ -0,0 +1,3 @@
+@@ -0,0 +1,2 @@
 +Manifest-Version: 1.0
 +Main-Class: Start
-+
 diff --git a/src/minecraft/net/minecraft/client/Minecraft.java b/src/minecraft/net/minecraft/client/Minecraft.java
-index 795b08a..0b431b7 100644
+index 795b08a..f501dcc 100644
 --- a/src/minecraft/net/minecraft/client/Minecraft.java
 +++ b/src/minecraft/net/minecraft/client/Minecraft.java
-@@ -169,6 +169,8 @@ import net.minecraft.world.storage.ISaveHandler;
+@@ -151,7 +151,6 @@ import net.minecraft.util.IThreadListener;
+ import net.minecraft.util.MathHelper;
+ import net.minecraft.util.MinecraftError;
+ import net.minecraft.util.MouseHelper;
+-import net.minecraft.util.MovementInputFromOptions;
+ import net.minecraft.util.MovingObjectPosition;
+ import net.minecraft.util.ReportedException;
+ import net.minecraft.util.ResourceLocation;
+@@ -169,7 +168,11 @@ import net.minecraft.world.storage.ISaveHandler;
  import net.minecraft.world.storage.WorldInfo;
  import net.unnamed.Unnamed;
  import net.unnamed.event.EventBus;
 +import net.unnamed.event.vanilla.ClientShutDownEvent;
 +import net.unnamed.event.vanilla.CurrentGUIScreenUpdateEvent;
  import net.unnamed.event.vanilla.WorldEvent;
++import net.unnamed.world.inputcontrol.Cameras;
++import net.unnamed.world.inputcontrol.PlayerMovementControl;
  import org.apache.commons.io.IOUtils;
  import org.apache.commons.lang3.Validate;
-@@ -988,6 +990,12 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+ import org.apache.logging.log4j.LogManager;
+@@ -988,6 +991,12 @@ public class Minecraft implements IThreadListener, IPlayerUsage
              this.ingameGUI.getChatGUI().clearChatMessages();
          }
  
@@ -47,7 +57,7 @@ index 795b08a..0b431b7 100644
          this.currentScreen = (GuiScreen)guiScreenIn;
  
          if (guiScreenIn != null)
-@@ -1116,6 +1124,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+@@ -1116,6 +1125,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
          this.mcProfiler.startSection("display");
          GlStateManager.enableTexture2D();
  
@@ -55,7 +65,7 @@ index 795b08a..0b431b7 100644
          if (this.thePlayer != null && this.thePlayer.isEntityInsideOpaqueBlock())
          {
              this.gameSettings.thirdPersonView = 0;
-@@ -1426,7 +1435,9 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+@@ -1426,7 +1436,9 @@ public class Minecraft implements IThreadListener, IPlayerUsage
       */
      public void shutdown()
      {
@@ -66,87 +76,527 @@ index 795b08a..0b431b7 100644
      }
  
      /**
+@@ -2395,7 +2407,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+ 
+             this.thePlayer.preparePlayerToSpawn();
+             worldClientIn.spawnEntityInWorld(this.thePlayer);
+-            this.thePlayer.movementInput = new MovementInputFromOptions(this.gameSettings);
++            this.thePlayer.movementInput = new PlayerMovementControl(this.gameSettings);
+             this.playerController.setPlayerCapabilities(this.thePlayer);
+             this.renderViewEntity = this.thePlayer;
+         }
+@@ -2433,7 +2445,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+         this.thePlayer.setClientBrand(s);
+         this.theWorld.spawnEntityInWorld(this.thePlayer);
+         this.playerController.flipPlayer(this.thePlayer);
+-        this.thePlayer.movementInput = new MovementInputFromOptions(this.gameSettings);
++        this.thePlayer.movementInput = new PlayerMovementControl(this.gameSettings);
+         this.thePlayer.setEntityId(i);
+         this.playerController.setPlayerCapabilities(this.thePlayer);
+         this.thePlayer.setReducedDebug(entityplayersp.hasReducedDebug());
+@@ -3183,6 +3195,10 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+ 
+     public Entity getRenderViewEntity()
+     {
++        if (Unnamed.clientSideWorld().isDefined()
++                && Unnamed.clientSideWorld().get().cameras().activeCamera().isDefined())
++            return Unnamed.clientSideWorld().get().cameras().activeCamera().get();
++
+         return this.renderViewEntity;
+     }
+ 
+diff --git a/src/minecraft/net/minecraft/client/entity/EntityPlayerSP.java b/src/minecraft/net/minecraft/client/entity/EntityPlayerSP.java
+index ef53142..82a5127 100644
+--- a/src/minecraft/net/minecraft/client/entity/EntityPlayerSP.java
++++ b/src/minecraft/net/minecraft/client/entity/EntityPlayerSP.java
+@@ -51,6 +51,7 @@ import net.minecraft.util.MovementInput;
+ import net.minecraft.util.ResourceLocation;
+ import net.minecraft.world.IInteractionObject;
+ import net.minecraft.world.World;
++import net.unnamed.world.schedule.Scheduler;
+ 
+ public class EntityPlayerSP extends AbstractClientPlayer
+ {
+@@ -705,7 +706,7 @@ public class EntityPlayerSP extends AbstractClientPlayer
+ 
+     protected boolean isCurrentViewEntity()
+     {
+-        return this.mc.getRenderViewEntity() == this;
++        return this.mc.getRenderViewEntity() == this || Scheduler.isPlayerControlledByScheduler();
+     }
+ 
+     /**
+diff --git a/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java b/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java
+index ea32192..09b0d0b 100644
+--- a/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java
++++ b/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java
+@@ -209,7 +209,7 @@ import net.minecraft.world.WorldProviderSurface;
+ import net.minecraft.world.WorldSettings;
+ import net.minecraft.world.chunk.Chunk;
+ import net.minecraft.world.storage.MapData;
+-import net.unnamed.antiexploit.AntiScanFromResourcePackConfirm;
++import net.unnamed.modules.antiexploit.AntiScanFromResourcePackConfirm;
+ import net.unnamed.event.EventBus;
+ import net.unnamed.event.unnamed.ProbeFromServerEvent;
+ import net.unnamed.event.unnamed.ServerProbes;
+@@ -517,6 +517,9 @@ public class NetHandlerPlayClient implements INetHandlerPlayClient
+      * Invoked when the server registers new proximate objects in your watchlist or when objects in your watchlist have
+      * changed -> Registers any changes locally
+      */
++
++    // TODO: figure out what this is responsible for
++    // and visualize this
+     public void handleEntityMetadata(S1CPacketEntityMetadata packetIn)
+     {
+         PacketThreadUtil.checkThreadAndEnqueue(packetIn, this, this.gameController);
+@@ -1669,6 +1672,8 @@ public class NetHandlerPlayClient implements INetHandlerPlayClient
+         this.addToSendQueue(new C00PacketKeepAlive(packetIn.func_149134_c()));
+     }
+ 
++
++    // TODO: important
+     public void handlePlayerAbilities(S39PacketPlayerAbilities packetIn)
+     {
+         PacketThreadUtil.checkThreadAndEnqueue(packetIn, this, this.gameController);
+diff --git a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$1.java b/src/minecraft/net/minecraft/client/renderer/EntityRenderer$1.java
+deleted file mode 100644
+index 1171b90..0000000
+--- a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$1.java
++++ /dev/null
+@@ -1,24 +0,0 @@
+-package net.minecraft.client.renderer;
+-
+-import com.google.common.base.Predicate;
+-import net.minecraft.entity.Entity;
+-
+-class EntityRenderer$1 implements Predicate
+-{
+-    final EntityRenderer field_90032_a;
+-
+-    EntityRenderer$1(EntityRenderer p_i1243_1_)
+-    {
+-        this.field_90032_a = p_i1243_1_;
+-    }
+-
+-    public boolean apply(Entity p_apply_1_)
+-    {
+-        return p_apply_1_.canBeCollidedWith();
+-    }
+-
+-    public boolean apply(Object p_apply_1_)
+-    {
+-        return this.apply((Entity)p_apply_1_);
+-    }
+-}
+diff --git a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$2.java b/src/minecraft/net/minecraft/client/renderer/EntityRenderer$2.java
+deleted file mode 100644
+index a3c979a..0000000
+--- a/src/minecraft/net/minecraft/client/renderer/EntityRenderer$2.java
++++ /dev/null
+@@ -1,20 +0,0 @@
+-package net.minecraft.client.renderer;
+-
+-import java.util.concurrent.Callable;
+-import net.minecraft.client.Minecraft;
+-
+-class EntityRenderer$2 implements Callable
+-{
+-    final EntityRenderer field_90025_c;
+-    private static final String __OBFID = "CL_00000948";
+-
+-    EntityRenderer$2(EntityRenderer p_i46419_1_)
+-    {
+-        this.field_90025_c = p_i46419_1_;
+-    }
+-
+-    public String call() throws Exception
+-    {
+-        return Minecraft.getMinecraft().currentScreen.getClass().getCanonicalName();
+-    }
+-}
+diff --git a/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java b/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java
+index 50c3a3b..debd63d 100644
+--- a/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java
++++ b/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java
+@@ -2,14 +2,6 @@ package net.minecraft.client.renderer;
+ 
+ import com.google.common.base.Predicates;
+ import com.google.gson.JsonSyntaxException;
+-import java.io.IOException;
+-import java.lang.reflect.Field;
+-import java.nio.FloatBuffer;
+-import java.util.Calendar;
+-import java.util.Date;
+-import java.util.List;
+-import java.util.Random;
+-import java.util.concurrent.Callable;
+ import net.minecraft.block.Block;
+ import net.minecraft.block.BlockBed;
+ import net.minecraft.block.material.Material;
+@@ -22,8 +14,6 @@ import net.minecraft.client.gui.MapItemRenderer;
+ import net.minecraft.client.gui.ScaledResolution;
+ import net.minecraft.client.multiplayer.WorldClient;
+ import net.minecraft.client.particle.EffectRenderer;
+-import net.minecraft.client.renderer.EntityRenderer$1;
+-import net.minecraft.client.renderer.EntityRenderer$2;
+ import net.minecraft.client.renderer.culling.ClippingHelperImpl;
+ import net.minecraft.client.renderer.culling.Frustum;
+ import net.minecraft.client.renderer.texture.DynamicTexture;
+@@ -53,31 +43,14 @@ import net.minecraft.inventory.IInventory;
+ import net.minecraft.item.ItemStack;
+ import net.minecraft.potion.Potion;
+ import net.minecraft.server.integrated.IntegratedServer;
+-import net.minecraft.util.AxisAlignedBB;
+-import net.minecraft.util.BlockPos;
+-import net.minecraft.util.ChatComponentText;
+-import net.minecraft.util.EntitySelectors;
+-import net.minecraft.util.EnumFacing;
+-import net.minecraft.util.EnumParticleTypes;
+-import net.minecraft.util.EnumWorldBlockLayer;
+-import net.minecraft.util.MathHelper;
+-import net.minecraft.util.MouseFilter;
+-import net.minecraft.util.MovingObjectPosition;
+-import net.minecraft.util.ReportedException;
+-import net.minecraft.util.ResourceLocation;
+-import net.minecraft.util.Vec3;
++import net.minecraft.util.*;
+ import net.minecraft.world.World;
+ import net.minecraft.world.WorldProvider;
+ import net.minecraft.world.WorldSettings;
+ import net.minecraft.world.biome.BiomeGenBase;
+-import optifine.Config;
+-import optifine.CustomColors;
+-import optifine.Lagometer;
+-import optifine.RandomMobs;
+-import optifine.Reflector;
+-import optifine.ReflectorForge;
+-import optifine.TextureUtils;
+-
++import net.unnamed.Unnamed;
++import net.unnamed.world.inputcontrol.Cameras;
++import optifine.*;
+ import org.apache.logging.log4j.LogManager;
+ import org.apache.logging.log4j.Logger;
+ import org.lwjgl.input.Mouse;
+@@ -89,6 +62,15 @@ import org.lwjgl.util.glu.Project;
+ import shadersmod.client.Shaders;
+ import shadersmod.client.ShadersRender;
+ 
++import java.io.IOException;
++import java.lang.reflect.Field;
++import java.nio.FloatBuffer;
++import java.util.Calendar;
++import java.util.Date;
++import java.util.List;
++import java.util.Random;
++import java.util.concurrent.Callable;
++
+ public class EntityRenderer implements IResourceManagerReloadListener
+ {
+     private static final Logger logger = LogManager.getLogger();
+@@ -454,7 +436,10 @@ public class EntityRenderer implements IResourceManagerReloadListener
+      */
+     public void getMouseOver(float partialTicks)
+     {
+-        Entity entity = this.mc.getRenderViewEntity();
++        Entity entity =
++                Unnamed.clientSideWorld().isDefined() ?
++                Unnamed.clientSideWorld().get().cameras().getPlayerOrSupposedToBeViewEntity() :
++                        mc.getRenderViewEntity();
+ 
+         if (entity != null && this.mc.theWorld != null)
+         {
+@@ -492,7 +477,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
+             this.pointedEntity = null;
+             Vec3 vec33 = null;
+             float f = 1.0F;
+-            List list = this.mc.theWorld.getEntitiesInAABBexcluding(entity, entity.getEntityBoundingBox().addCoord(vec31.xCoord * d0, vec31.yCoord * d0, vec31.zCoord * d0).expand((double)f, (double)f, (double)f), Predicates.and(EntitySelectors.NOT_SPECTATING, new EntityRenderer$1(this)));
++            List list = this.mc.theWorld.getEntitiesInAABBexcluding(entity, entity.getEntityBoundingBox().addCoord(vec31.xCoord * d0, vec31.yCoord * d0, vec31.zCoord * d0).expand((double)f, (double)f, (double)f), Predicates.and(EntitySelectors.NOT_SPECTATING, new EntityRendererPred(this)));
+             double d2 = d1;
+ 
+             for (int i = 0; i < list.size(); ++i)
+@@ -1294,12 +1279,18 @@ public class EntityRenderer implements IResourceManagerReloadListener
+                 this.smoothCamPartialTicks = p_181560_1_;
+                 f2 = this.smoothCamFilterX * f4;
+                 f3 = this.smoothCamFilterY * f4;
++
++                if (Unnamed.clientSideWorld().get().cameras().activeCamera().isDefined())
++                    Unnamed.clientSideWorld().get().cameras().activeCamera().get().setAngles(f2, f3 * (float) b0);
+                 this.mc.thePlayer.setAngles(f2, f3 * (float)b0);
+             }
+             else
+             {
+                 this.smoothCamYaw = 0.0F;
+                 this.smoothCamPitch = 0.0F;
++
++                if (Unnamed.clientSideWorld().get().cameras().activeCamera().isDefined())
++                    Unnamed.clientSideWorld().get().cameras().activeCamera().get().setAngles(f2, f3 * (float) b0);
+                 this.mc.thePlayer.setAngles(f2, f3 * (float)b0);
+             }
+         }
+@@ -1393,7 +1384,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
+                 {
+                     CrashReport crashreport = CrashReport.makeCrashReport(throwable, "Rendering screen");
+                     CrashReportCategory crashreportcategory = crashreport.makeCategory("Screen render details");
+-                    crashreportcategory.addCrashSectionCallable("Screen name", new EntityRenderer$2(this));
++                    crashreportcategory.addCrashSectionCallable("Screen name", new EntityRendererCallable(this));
+                     crashreportcategory.addCrashSectionCallable("Mouse location", new Callable()
+                     {
+                         private static final String __OBFID = "CL_00000950";
+@@ -1439,7 +1430,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
+         }
+         else
+         {
+-            Entity entity = this.mc.getRenderViewEntity();
++            Entity entity = Unnamed.clientSideWorld().get().cameras().getPlayerOrSupposedToBeViewEntity();
+             boolean flag = entity instanceof EntityPlayer && !this.mc.gameSettings.hideGUI;
+ 
+             if (flag && !((EntityPlayer)entity).capabilities.allowEdit)
+diff --git a/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java b/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java
+index 1ac5166..e3ba7ac 100644
+--- a/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java
++++ b/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java
+@@ -90,6 +90,8 @@ import net.minecraft.world.IWorldAccess;
+ import net.minecraft.world.WorldProvider;
+ import net.minecraft.world.border.WorldBorder;
+ import net.minecraft.world.chunk.Chunk;
++import net.unnamed.Unnamed;
++import net.unnamed.world.inputcontrol.Cameras;
+ import optifine.ChunkUtils;
+ import optifine.CloudRenderer;
+ import optifine.Config;
+@@ -782,8 +784,10 @@ public class RenderGlobal implements IWorldAccess, IResourceManagerReloadListene
+ 
+                                 boolean flag6 = this.mc.getRenderViewEntity() instanceof EntityLivingBase ? ((EntityLivingBase)this.mc.getRenderViewEntity()).isPlayerSleeping() : false;
+ 
+-                                if ((entity2 != this.mc.getRenderViewEntity() || this.mc.gameSettings.thirdPersonView != 0 || flag6) && (entity2.posY < 0.0D || entity2.posY >= 256.0D || this.theWorld.isBlockLoaded(new BlockPos(entity2))))
++                                if ((entity2 != this.mc.getRenderViewEntity() || this.mc.gameSettings.thirdPersonView != 0 || flag6 || (Unnamed.clientSideWorld().get().cameras().activeCamera().isDefined() && entity == mc.thePlayer))
++                                        && (entity2.posY < 0.0D || entity2.posY >= 256.0D || this.theWorld.isBlockLoaded(new BlockPos(entity2))))
+                                 {
++
+                                     ++this.countEntitiesRendered;
+ 
+                                     if (entity2.getClass() == EntityItemFrame.class)
+diff --git a/src/minecraft/net/minecraft/entity/Entity.java b/src/minecraft/net/minecraft/entity/Entity.java
+index 5626546..30bf1dc 100644
+--- a/src/minecraft/net/minecraft/entity/Entity.java
++++ b/src/minecraft/net/minecraft/entity/Entity.java
+@@ -46,6 +46,8 @@ import net.minecraft.util.Vec3;
+ import net.minecraft.world.Explosion;
+ import net.minecraft.world.World;
+ import net.minecraft.world.WorldServer;
++import net.unnamed.event.EventBus;
++import net.unnamed.event.vanilla.MovementCalculatePreEvent;
+ 
+ public abstract class Entity implements ICommandSender
+ {
+@@ -1211,8 +1213,19 @@ public abstract class Entity implements ICommandSender
+     /**
+      * Used in both water and by flying objects
+      */
++
++    // TODO: used for calculate motion, use for Camera control
+     public void moveFlying(float strafe, float forward, float friction)
+     {
++        MovementCalculatePreEvent event = new MovementCalculatePreEvent(this, forward, strafe, friction);
++        EventBus.fireEventJ(event);
++        if (event.isCanceled())
++            return;
++
++        strafe = event.strafe();
++        forward = event.forward();
++        friction = event.friction();
++
+         float f = strafe * strafe + forward * forward;
+ 
+         if (f >= 1.0E-4F)
 diff --git a/src/minecraft/net/unnamed/Unnamed.scala b/src/minecraft/net/unnamed/Unnamed.scala
-index 1cc8d1e..14756e0 100644
+index 1cc8d1e..87fd683 100644
 --- a/src/minecraft/net/unnamed/Unnamed.scala
 +++ b/src/minecraft/net/unnamed/Unnamed.scala
-@@ -1,8 +1,9 @@
+@@ -1,8 +1,11 @@
  package net.unnamed
  
- import net.unnamed.event.EventBus
+-import net.unnamed.event.EventBus
 -import net.unnamed.event.unnamed.UnnamedListeners
 +import net.unnamed.event.unnamed.UnnamedEventsGen
++import net.unnamed.event.vanilla.WorldEvent
++import net.unnamed.event.{AlwaysActiveListener, EventBus}
  import net.unnamed.modules.Modules
 +import net.unnamed.settings.Settings
++import net.unnamed.world.ClientSideWorld
  
  object Unnamed {
    val name = "unnamed"
-@@ -11,8 +12,10 @@ object Unnamed {
+@@ -10,9 +13,20 @@ object Unnamed {
+ 
    val eventBus: EventBus.type = EventBus
  
++  var clientSideWorld: Option[ClientSideWorld] = None
++
    val launch: Unit = {
 -    UnnamedListeners
++
++    EventBus += new AlwaysActiveListener[WorldEvent]((event: WorldEvent) => {
++      if (event.worldClient != null)
++        clientSideWorld = Some(new ClientSideWorld(event.worldClient))
++    })
++
 +    UnnamedEventsGen
      Modules
--
 +    Settings
+ 
 +    Settings.loadSettings()
 +    Settings.changeActiveLocalSetting()
    }
  }
 diff --git a/src/minecraft/net/unnamed/antiexploit/AntiScanFromResourcePackConfirm.scala b/src/minecraft/net/unnamed/antiexploit/AntiScanFromResourcePackConfirm.scala
-index 7a83f5d..2f9cbda 100644
+deleted file mode 100644
+index 7a83f5d..0000000
 --- a/src/minecraft/net/unnamed/antiexploit/AntiScanFromResourcePackConfirm.scala
-+++ b/src/minecraft/net/unnamed/antiexploit/AntiScanFromResourcePackConfirm.scala
-@@ -1,6 +1,6 @@
- package net.unnamed.antiexploit
- 
++++ /dev/null
+@@ -1,9 +0,0 @@
+-package net.unnamed.antiexploit
+-
 -import net.unnamed.utils.common.interface.Toggleable
-+import net.unnamed.utils.common.ifce.Toggleable
- 
- object AntiScanFromResourcePackConfirm extends Toggleable {
-   {
+-
+-object AntiScanFromResourcePackConfirm extends Toggleable {
+-  {
+-    on()
+-  }
+-}
+\ No newline at end of file
 diff --git a/src/minecraft/net/unnamed/cheats/packet/modification/Velocity.scala b/src/minecraft/net/unnamed/cheats/packet/modification/Velocity.scala
-index 369d758..afae799 100644
+index 369d758..bd77127 100644
 --- a/src/minecraft/net/unnamed/cheats/packet/modification/Velocity.scala
 +++ b/src/minecraft/net/unnamed/cheats/packet/modification/Velocity.scala
-@@ -1,7 +1,7 @@
+@@ -1,18 +1,18 @@
  package net.unnamed.cheats.packet.modification
  
- import net.unnamed.event.unnamed.PlayerKnockBackEvent
+-import net.unnamed.event.unnamed.PlayerKnockBackEvent
 -import net.unnamed.utils.common.interface.MinecraftInstance
++import net.unnamed.event.unnamed.PlayerGotKnockedBackEvent
 +import net.unnamed.utils.common.ifce.MinecraftInstance
  
  import javax.vecmath.Vector2d
  
-diff --git a/src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala b/src/minecraft/net/unnamed/event/unnamed/UnnamedEventsGen.scala
-similarity index 84%
-rename from src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala
-rename to src/minecraft/net/unnamed/event/unnamed/UnnamedEventsGen.scala
-index ee521f3..b7b9cc0 100644
---- a/src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala
+ 
+ object Velocity extends MinecraftInstance {
+ 
+-  def cancelPlayerKnockBackEvent(event: PlayerKnockBackEvent): Unit = {
++  def cancelPlayerKnockBackEvent(event: PlayerGotKnockedBackEvent): Unit = {
+     event.cancel()
+   }
+ 
+-  def modifyKnockBackBy(event: PlayerKnockBackEvent)(byVertical: Double)(byHorizontal: Vector2d): Unit = {
++  def modifyKnockBackBy(event: PlayerGotKnockedBackEvent)(byVertical: Double)(byHorizontal: Vector2d): Unit = {
+     val packet = event.packet
+ 
+     packet.motionY = (packet.motionY * byVertical).toInt
+diff --git a/src/minecraft/net/unnamed/event/unnamed/PlayerKnockBackEvent.scala b/src/minecraft/net/unnamed/event/unnamed/PlayerKnockBackEvent.scala
+deleted file mode 100644
+index 8e7fe18..0000000
+--- a/src/minecraft/net/unnamed/event/unnamed/PlayerKnockBackEvent.scala
++++ /dev/null
+@@ -1,6 +0,0 @@
+-package net.unnamed.event.unnamed
+-
+-import net.minecraft.network.play.server.S12PacketEntityVelocity
+-import net.unnamed.event.CancelableEvent
+-
+-case class PlayerKnockBackEvent(packet: S12PacketEntityVelocity) extends CancelableEvent
+diff --git a/src/minecraft/net/unnamed/event/unnamed/UnnamedEventsGen.scala b/src/minecraft/net/unnamed/event/unnamed/UnnamedEventsGen.scala
+new file mode 100644
+index 0000000..c26f6b1
+--- /dev/null
 +++ b/src/minecraft/net/unnamed/event/unnamed/UnnamedEventsGen.scala
-@@ -4,9 +4,9 @@ import net.minecraft.network.play.client.C0FPacketConfirmTransaction
- import net.minecraft.network.play.server.{S12PacketEntityVelocity, S23PacketBlockChange, S32PacketConfirmTransaction}
- import net.unnamed.event.vanilla.PacketEvent
- import net.unnamed.event.{AlwaysActiveListener, EventBus}
--import net.unnamed.utils.common.interface.MinecraftInstance
+@@ -0,0 +1,46 @@
++package net.unnamed.event.unnamed
++
++import net.minecraft.network.play.client.C0FPacketConfirmTransaction
++import net.minecraft.network.play.server.{S12PacketEntityVelocity, S23PacketBlockChange, S32PacketConfirmTransaction}
++import net.unnamed.event.vanilla.{MovementCalculatePreEvent, PacketEvent}
++import net.unnamed.event.{AlwaysActiveListener, Event, EventBus}
 +import net.unnamed.utils.common.ifce.MinecraftInstance
- 
--object UnnamedListeners extends MinecraftInstance {
++
 +object UnnamedEventsGen extends MinecraftInstance {
-   {
-     EventBus +=
-       new AlwaysActiveListener[PacketEvent](
-@@ -24,7 +24,7 @@ object UnnamedListeners extends MinecraftInstance {
-             EventBus.fireEvent(ProbeFromServerEvent(ServerProbes.TRANSACTION_PING,
-               s"Window id: ${transactionPacket.getWindowId}" +
-                 s"Action Number: ${transactionPacket.getActionNumber}" +
--                s"Send C0FPacketConfirmTransaction: ${!transactionPacket.func_148888_e()}"))
++  {
++    EventBus +=
++      new AlwaysActiveListener[PacketEvent](
++        (event: PacketEvent) => event.packet match {
++
++          case velocityPacket: S12PacketEntityVelocity =>
++            if (velocityPacket.getEntityID == mc.thePlayer.getEntityId) {
++              val kbEvent = PlayerGotKnockedBackEvent(velocityPacket)
++              EventBus.fireEvent(kbEvent)
++              if (kbEvent.isCanceled)
++                event.cancel()
++            }
++
++          case transactionPacket: S32PacketConfirmTransaction =>
++            EventBus.fireEvent(ProbeFromServerEvent(ServerProbes.TRANSACTION_PING,
++              s"Window id: ${transactionPacket.getWindowId}" +
++                s"Action Number: ${transactionPacket.getActionNumber}" +
 +                s"Should Send C0FPacketConfirmTransaction: ${!transactionPacket.func_148888_e()}"))
- 
-           case _ =>
-         })
++
++          case _ =>
++        }) +=
++      new AlwaysActiveListener[MovementCalculatePreEvent]((event: MovementCalculatePreEvent) =>
++        if (event.entity == mc.thePlayer) {
++          val strafeEvent = PlayerMovementCalculatePreEvent(event.forward, event.strafe, event.friction)
++          EventBus.fireEvent(strafeEvent)
++
++          if (strafeEvent.isCanceled)
++            event.cancel()
++          else {
++            event.forward = strafeEvent.forward
++            event.strafe = strafeEvent.strafe
++            event.friction = strafeEvent.friction
++          }
++        }
++      )
++  }
++}
+diff --git a/src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala b/src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala
+deleted file mode 100644
+index ee521f3..0000000
+--- a/src/minecraft/net/unnamed/event/unnamed/UnnamedListeners.scala
++++ /dev/null
+@@ -1,34 +0,0 @@
+-package net.unnamed.event.unnamed
+-
+-import net.minecraft.network.play.client.C0FPacketConfirmTransaction
+-import net.minecraft.network.play.server.{S12PacketEntityVelocity, S23PacketBlockChange, S32PacketConfirmTransaction}
+-import net.unnamed.event.vanilla.PacketEvent
+-import net.unnamed.event.{AlwaysActiveListener, EventBus}
+-import net.unnamed.utils.common.interface.MinecraftInstance
+-
+-object UnnamedListeners extends MinecraftInstance {
+-  {
+-    EventBus +=
+-      new AlwaysActiveListener[PacketEvent](
+-        (event: PacketEvent) => event.packet match {
+-
+-          case velocityPacket: S12PacketEntityVelocity =>
+-            if (velocityPacket.getEntityID == mc.thePlayer.getEntityId) {
+-              val kbEvent = PlayerKnockBackEvent(velocityPacket)
+-              EventBus.fireEvent(kbEvent)
+-              if (kbEvent.isCanceled)
+-                event.cancel()
+-            }
+-
+-          case transactionPacket: S32PacketConfirmTransaction =>
+-            EventBus.fireEvent(ProbeFromServerEvent(ServerProbes.TRANSACTION_PING,
+-              s"Window id: ${transactionPacket.getWindowId}" +
+-                s"Action Number: ${transactionPacket.getActionNumber}" +
+-                s"Send C0FPacketConfirmTransaction: ${!transactionPacket.func_148888_e()}"))
+-
+-          case _ =>
+-        })
+-
+-
+-  }
+-}
 diff --git a/src/minecraft/net/unnamed/event/vanilla/ClientShutDownEvent.scala b/src/minecraft/net/unnamed/event/vanilla/ClientShutDownEvent.scala
 new file mode 100644
 index 0000000..66d3169
@@ -171,17 +621,17 @@ index 0000000..e75382d
 +
 +case class CurrentGUIScreenUpdateEvent(newScreen: GuiScreen) extends CancelableEvent
 diff --git a/src/minecraft/net/unnamed/modules/Module.scala b/src/minecraft/net/unnamed/modules/Module.scala
-index 173d436..1beded4 100644
+index 173d436..1881b6f 100644
 --- a/src/minecraft/net/unnamed/modules/Module.scala
 +++ b/src/minecraft/net/unnamed/modules/Module.scala
-@@ -2,30 +2,57 @@ package net.unnamed.modules
+@@ -2,30 +2,58 @@ package net.unnamed.modules
  
  import net.unnamed.event.unnamed.ModuleToggleEvent
  import net.unnamed.event.{Event, EventBus, Listener}
 -import net.unnamed.utils.common.interface.{MinecraftInstance, Toggleable}
 +import net.unnamed.settings.Settings.ISaveLocal
 +import net.unnamed.settings.setting.SaveThisAlso
-+import net.unnamed.utils.common.ifce.{MinecraftInstance, Toggleable}
++import net.unnamed.utils.common.ifce.{ClientInstance, MinecraftInstance, Toggleable}
  
  import scala.reflect.ClassTag
  
@@ -190,7 +640,7 @@ index 173d436..1beded4 100644
 -              val displayName: String = "Module Name",
                val description: String = "As the name suggests"
 -            ) extends Toggleable with MinecraftInstance {
-+            ) extends Toggleable with MinecraftInstance with ISaveLocal {
++            ) extends Toggleable with ClientInstance with MinecraftInstance with ISaveLocal {
  
    {
    }
@@ -216,14 +666,15 @@ index 173d436..1beded4 100644
 +  override def isOn: Boolean = state
 +
 +
-+  def moduleName(): String =
-+    getClass.getSimpleName
++  val moduleName: String = getClass.getSimpleName
 +
    def onEnable(): Unit = {}
  
    def onDisable(): Unit = {}
  
  
++  val enableOnJoin: Boolean = true
++
    override def onToggle(): Unit = {
 -    if (mc.theWorld != null)
 -      if (isOn)
@@ -241,26 +692,33 @@ index 173d436..1beded4 100644
      EventBus.fireEvent(ModuleToggleEvent(this))
    }
 diff --git a/src/minecraft/net/unnamed/modules/Modules.scala b/src/minecraft/net/unnamed/modules/Modules.scala
-index 97343b1..37d7bad 100644
+index 97343b1..a990c93 100644
 --- a/src/minecraft/net/unnamed/modules/Modules.scala
 +++ b/src/minecraft/net/unnamed/modules/Modules.scala
-@@ -1,8 +1,10 @@
+@@ -1,8 +1,11 @@
  package net.unnamed.modules
  
 -import net.unnamed.event.vanilla.WorldEvent
 -import net.unnamed.event.{Event, EventBus, Listener}
+-import net.unnamed.modules.render.FullBright
 +import net.minecraft.client.gui.GuiIngameMenu
 +import net.unnamed.event.vanilla.{CurrentGUIScreenUpdateEvent, WorldEvent}
 +import net.unnamed.event.{AlwaysActiveListener, Event, EventBus, Listener}
- import net.unnamed.modules.render.FullBright
++import net.unnamed.modules.antiexploit.AntiScanFromResourcePackConfirm
++import net.unnamed.modules.render.{FreeCam, FullBright}
 +import net.unnamed.settings.Settings
  
  case object Modules {
    var modules: List[Module] = Nil
-@@ -13,16 +15,29 @@ case object Modules {
+@@ -10,19 +13,34 @@ case object Modules {
+ 
+   {
+     modules ::= FullBright
++    modules ::= AntiScanFromResourcePackConfirm
++    modules ::= FreeCam
  
  
-     // TODO: load modules config and enable on world join
+-    // TODO: load modules config and enable on world join
 -    EventBus += new Listener[WorldEvent]() {
 -      override def isActive: Boolean = true
 -
@@ -272,6 +730,9 @@ index 97343b1..37d7bad 100644
 +          for (module <- modules) {
 +
 +            module.loadSetting()
++
++            if (!module.enableOnJoin)
++              module.off()
 +
 +            if (module.isOn)
 +              module.onEnable()
@@ -288,8 +749,6 @@ index 97343b1..37d7bad 100644
 +        if (event.newScreen.isInstanceOf[GuiIngameMenu]) {
 +          for (module <- modules)
 +            module.saveSetting()
-+
-+          Settings.saveSettings()
 +        }
 +      })
    }
@@ -314,24 +773,25 @@ index 9a33548..c619bcf 100644
  
 diff --git a/src/minecraft/net/unnamed/settings/Settings.scala b/src/minecraft/net/unnamed/settings/Settings.scala
 new file mode 100644
-index 0000000..56a7041
+index 0000000..ed3a416
 --- /dev/null
 +++ b/src/minecraft/net/unnamed/settings/Settings.scala
-@@ -0,0 +1,224 @@
+@@ -0,0 +1,242 @@
 +package net.unnamed.settings
 +
 +import com.google.gson._
 +import com.google.gson.annotations.Expose
++import net.minecraft.client.gui.GuiIngameMenu
 +import net.unnamed.Unnamed
-+import net.unnamed.event.vanilla.ClientShutDownEvent
++import net.unnamed.event.vanilla.{ClientShutDownEvent, CurrentGUIScreenUpdateEvent}
 +import net.unnamed.event.{AlwaysActiveListener, EventBus}
-+import net.unnamed.settings.setting.{SaveThisAlso, Setting}
++import net.unnamed.settings.setting.{SaveThisAlso, Setting, SettingDeserializer, SettingSerializer}
 +import net.unnamed.utils.ReflectionUtils
 +import net.unnamed.utils.common.ifce.MinecraftInstance
 +
 +import java.io.{BufferedReader, File, FileReader, FileWriter}
 +import java.lang.reflect.Field
-+import java.util.Map
++import java.util
 +import scala.collection.convert.ImplicitConversions._
 +import scala.collection.mutable
 +
@@ -339,6 +799,10 @@ index 0000000..56a7041
 +
 +  {
 +    EventBus += new AlwaysActiveListener[ClientShutDownEvent]((_: ClientShutDownEvent) => saveSettings())
++    EventBus += new AlwaysActiveListener[CurrentGUIScreenUpdateEvent]((event: CurrentGUIScreenUpdateEvent) =>
++      if (event.newScreen.isInstanceOf[GuiIngameMenu])
++        saveSettings()
++    )
 +  }
 +
 +
@@ -348,9 +812,20 @@ index 0000000..56a7041
 +  var activeDirectory = new File(settingsDirectory, "default")
 +  var activeSettings: mutable.Map[String, List[ISaveLocal]] = new mutable.HashMap[String, List[ISaveLocal]]().withDefaultValue(Nil)
 +
-+  val serializer: Gson = new GsonBuilder()
-+    .excludeFieldsWithoutExposeAnnotation()
-+    .create()
++
++  val serializer: Gson = {
++    val builder = new GsonBuilder()
++
++    ReflectionUtils.getAllSubClassInPackage(getClass.getPackage, classOf[Setting[_]]).foreach((value: Class[Setting[_]]) => {
++      builder.registerTypeAdapter(value, SettingSerializer)
++      builder.registerTypeAdapter(value, SettingDeserializer)
++    })
++
++    builder
++      .excludeFieldsWithoutExposeAnnotation()
++      .setPrettyPrinting()
++      .create()
++  }
 +
 +  val parser = new JsonParser()
 +
@@ -364,7 +839,7 @@ index 0000000..56a7041
 +      for (jsonElement <- settings) {
 +
 +        val jsonObject = jsonElement.getAsJsonObject
-+        jsonObject.entrySet().foreach((value: Map.Entry[String, JsonElement]) => {
++        jsonObject.entrySet().foreach((value: util.Map.Entry[String, JsonElement]) => {
 +
 +          val settingField = ReflectionUtils.getAllField(this)
 +            .find((field: Field) => field.getName == value.getKey)
@@ -376,16 +851,19 @@ index 0000000..56a7041
 +          val originalSetting = settingField.get(this)
 +          val deserializedSetting = serializer.fromJson(value.getValue, originalSetting.getClass)
 +
-+          ReflectionUtils.getAllField(deserializedSetting).foreach((field: Field) => {
++          if (settingField.isAnnotationPresent(classOf[SaveThisAlso]))
++            settingField.set(this, deserializedSetting)
++          else
++            ReflectionUtils.getAllField(originalSetting).foreach((field: Field) => {
 +
-+            if (!field.isAnnotationPresent(classOf[Expose]))
-+              return
++              if (field.isAnnotationPresent(classOf[Expose])) {
 +
-+            if (!field.isAccessible)
-+              field.setAccessible(true)
++                if (!field.isAccessible)
++                  field.setAccessible(true)
 +
-+            field.set(field.get(deserializedSetting), originalSetting)
-+          })
++                field.set(originalSetting, field.get(deserializedSetting))
++              }
++            })
 +        })
 +      }
 +    }
@@ -396,7 +874,7 @@ index 0000000..56a7041
 +        if (!field.isAccessible)
 +          field.setAccessible(true)
 +
-+        field.getClass.isAssignableFrom(classOf[Setting[_]]) ||
++        classOf[Setting[_]].isAssignableFrom(field.getType) ||
 +          field.isAnnotationPresent(classOf[SaveThisAlso])
 +      }
 +      )
@@ -405,7 +883,7 @@ index 0000000..56a7041
 +          val setting = field.get(this)
 +
 +          val jsonObject = new JsonObject
-+          jsonObject.add(field.getName, parser.parse(serializer.toJson(setting)))
++          jsonObject.add(field.getName, serializer.toJsonTree(setting))
 +          settings.add(jsonObject)
 +        })
 +
@@ -541,7 +1019,6 @@ index 0000000..56a7041
 +  }
 +
 +}
-+
 diff --git a/src/minecraft/net/unnamed/settings/setting/SaveThisAlso.java b/src/minecraft/net/unnamed/settings/setting/SaveThisAlso.java
 new file mode 100644
 index 0000000..6126d40
@@ -561,20 +1038,25 @@ index 0000000..6126d40
 +}
 diff --git a/src/minecraft/net/unnamed/settings/setting/Setting.scala b/src/minecraft/net/unnamed/settings/setting/Setting.scala
 new file mode 100644
-index 0000000..e5282ad
+index 0000000..9d238c7
 --- /dev/null
 +++ b/src/minecraft/net/unnamed/settings/setting/Setting.scala
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,103 @@
 +package net.unnamed.settings.setting
 +
++import com.google.gson.{Gson, GsonBuilder, JsonDeserializationContext, JsonDeserializer, JsonElement, JsonSerializationContext, JsonSerializer}
 +import com.google.gson.annotations.Expose
++import net.unnamed.settings.Settings
++
++import java.lang.reflect.Type
 +
 +trait Setting[T] {
 +  // TODO: integrate with internal REPL (that doesn't exist yet)
-+  @Expose
-+  var expr: Option[String] = None
 +
-+  def getValue: T
++  @(Expose @annotation.meta.field)
++  var expr: String = null
++
++  protected def getValue: T
 +
 +  def get: T = {
 +    //    if (expr.isDefined)
@@ -585,11 +1067,36 @@ index 0000000..e5282ad
 +
 +  def set(value: T): Unit
 +
-+  def suggestedValue: String
++  val suggestedValue: String
 +}
 +
++object SettingSerializer extends JsonSerializer[Setting[_]] {
++
++  val serializer: Gson =  new GsonBuilder().excludeFieldsWithoutExposeAnnotation().create()
++
++  override def serialize(src: Setting[_], `type`: Type, jsonSerializationContext: JsonSerializationContext): JsonElement = {
++    val jsonObject = serializer.toJsonTree(src).getAsJsonObject
++    jsonObject.addProperty("expr", src.expr)
++    jsonObject
++  }
++}
++
++object SettingDeserializer extends JsonDeserializer[Setting[_]] {
++
++  val serializer: Gson =  new Gson()
++
++  override def deserialize(jsonElement: JsonElement, `type`: Type, jsonDeserializationContext: JsonDeserializationContext): Setting[_] = {
++    val setting = serializer.fromJson(jsonElement, `type`).asInstanceOf[Setting[_]]
++    val expr = jsonElement.getAsJsonObject.get("expr")
++    if (expr != null)
++      setting.expr = expr.getAsString
++    setting
++  }
++}
++
++
 +class BoolSetting(
-+                   @Expose
++                   @(Expose @annotation.meta.field)
 +                   private var on: Boolean,
 +                   private val default: Boolean = false) extends Setting[Boolean] {
 +  override def set(value: Boolean): Unit =
@@ -597,11 +1104,11 @@ index 0000000..e5282ad
 +
 +  override def getValue: Boolean = on
 +
-+  override def suggestedValue: String = default.toString
++  override val suggestedValue: String = default.toString
 +}
 +
 +class IntegerSetting(
-+                      @Expose
++                      @(Expose @annotation.meta.field)
 +                      private var number: Int,
 +                      private val suggestedLower: Int = 0,
 +                      private val suggestedHigher: Int = 1) extends Setting[Int] {
@@ -610,12 +1117,12 @@ index 0000000..e5282ad
 +  override def set(value: Int): Unit =
 +    number = value
 +
-+  override def suggestedValue: String = s"[$suggestedLower, $suggestedHigher]"
++  override val suggestedValue: String = s"[$suggestedLower, $suggestedHigher]"
 +}
 +
 +
 +class FloatSetting(
-+                    @Expose
++                    @(Expose @annotation.meta.field)
 +                    private var number: Float,
 +                    private val suggestedLower: Float = 0,
 +                    private val suggestedHigher: Float = 1) extends Setting[Float] {
@@ -624,11 +1131,11 @@ index 0000000..e5282ad
 +  override def set(value: Float): Unit =
 +    number = value
 +
-+  override def suggestedValue: String = s"[$suggestedLower, $suggestedHigher]"
++  override val suggestedValue: String = s"[$suggestedLower, $suggestedHigher]"
 +}
 +
 +class ListSetting(
-+                   @Expose
++                   @(Expose @annotation.meta.field)
 +                   private var choice: String,
 +                   private val suggestedList: List[String] = Nil) extends Setting[String] {
 +  override def getValue: String = choice
@@ -636,7 +1143,7 @@ index 0000000..e5282ad
 +  override def set(value: String): Unit =
 +    choice = value
 +
-+  override def suggestedValue: String = suggestedList.toString()
++  override val suggestedValue: String = suggestedList.toString()
 +}
 \ No newline at end of file
 diff --git a/src/minecraft/net/unnamed/utils/REPLHelper.scala b/src/minecraft/net/unnamed/utils/REPLHelper.scala
@@ -667,12 +1174,13 @@ index 0000000..82bb1a4
 +}
 diff --git a/src/minecraft/net/unnamed/utils/ReflectionUtils.scala b/src/minecraft/net/unnamed/utils/ReflectionUtils.scala
 new file mode 100644
-index 0000000..d125734
+index 0000000..0ac3c67
 --- /dev/null
 +++ b/src/minecraft/net/unnamed/utils/ReflectionUtils.scala
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,61 @@
 +package net.unnamed.utils
 +
++import java.io.File
 +import java.lang.reflect.Field
 +
 +case object ReflectionUtils {
@@ -687,6 +1195,48 @@ index 0000000..d125734
 +    }
 +
 +    fields
++  }
++
++  def getAllSubClassInPackage[T](pack: Package, clazz: Class[T]): List[Class[T]] = {
++    val clazzs = getClasses(pack.getName)
++    clazzs.filter((value: Class[_]) => clazz.isAssignableFrom(value) && clazz != value).asInstanceOf[List[Class[T]]]
++  }
++
++
++  private def getClasses(packageName: String) = {
++    val classLoader = Thread.currentThread.getContextClassLoader
++    assert(classLoader != null)
++    val path = packageName.replace('.', '/')
++    val resources = classLoader.getResources(path)
++    var dirs: List[File] = Nil
++    while ( {
++      resources.hasMoreElements
++    }) {
++      val resource = resources.nextElement
++      dirs ::= new File(resource.getFile)
++    }
++    var classes: List[Class[_]] = Nil
++    for (directory <- dirs) {
++      classes ++= findClasses(directory, packageName)
++    }
++    classes
++  }
++
++  private def findClasses(directory: File, packageName: String):List[Class[_]] = {
++    var classes: List[Class[_]] = Nil
++    if (directory.exists) {
++
++      val files = directory.listFiles
++      for (file <- files) {
++        if (file.isDirectory) {
++          assert(!file.getName.contains("."))
++          classes ++= findClasses(file, packageName + "." + file.getName)
++        }
++        else if (file.getName.endsWith(".class"))
++          classes ::= (Class.forName(packageName + '.' + file.getName.substring(0, file.getName.length - 6)))
++      }
++    }
++    classes
 +  }
 +}
 diff --git a/src/minecraft/net/unnamed/utils/common/interface/MinecraftInstance.scala b/src/minecraft/net/unnamed/utils/common/ifce/MinecraftInstance.scala
