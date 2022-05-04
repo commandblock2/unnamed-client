@@ -13,6 +13,10 @@ REPLHelper.startMinecraft()
 will launch Minecraft and have the REPL stay available for you.
 
 This client is written from scratch in Scala, which means it will have a very different client base and design, have fun skidding.
+
+
+Also, **FUCK Eclipse, and generally all IDE for jvm for license**.
+
 ## Building on *nix
 ### Prerequisites
 `net-misc/curl` `sys-apps/coreutils` `app-arch/unzip` `dev-python/virtualenv`.  
@@ -38,7 +42,10 @@ You might have to change the scala sdk version on your machine.
 
 `setup-scripts/install.sh <directory - default: ~/.minecraft>` copies the built jar and json.
 
-## Notes
+## Lib policy
+Only publicly maintained libs like `graaljs`, `vecmath` should be added with idea project with latest. No closed source libs would be considered. Other than those should be embbed and put into the `src/embeddedlibs`.
+
+## Other Notes
 It is recommended that you should audit the code in this repo.  
 The repository stores patches to build the development environment and scripts to automate this process.  
 Any help is appreciated, especially those can optimize workflow.  

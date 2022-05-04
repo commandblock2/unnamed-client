@@ -1,0 +1,736 @@
+diff --git a/mcp918.iml b/mcp918.iml
+index b40bf98..52a5fe6 100644
+--- a/mcp918.iml
++++ b/mcp918.iml
+@@ -16,6 +16,7 @@
+     <exclude-output />
+     <content url="file://$MODULE_DIR$/../idea-project" />
+     <content url="file://$MODULE_DIR$">
++      <sourceFolder url="file://$MODULE_DIR$/src/embeddedlibs" isTestSource="false" />
+       <sourceFolder url="file://$MODULE_DIR$/src/minecraft" isTestSource="false" />
+     </content>
+     <orderEntry type="inheritedJdk" />
+diff --git a/src/minecraft/net/minecraft/client/entity/AbstractClientPlayer.java b/src/minecraft/net/minecraft/client/entity/AbstractClientPlayer.java
+index 597bdb5..a009d8f 100644
+--- a/src/minecraft/net/minecraft/client/entity/AbstractClientPlayer.java
++++ b/src/minecraft/net/minecraft/client/entity/AbstractClientPlayer.java
+@@ -17,6 +17,8 @@ import net.minecraft.util.ResourceLocation;
+ import net.minecraft.util.StringUtils;
+ import net.minecraft.world.World;
+ import net.minecraft.world.WorldSettings;
++import net.unnamed.modules.render.NoFOV;
++import net.unnamed.settings.setting.FloatSetting;
+ import optifine.CapeUtils;
+ import optifine.Config;
+ import optifine.PlayerConfigurations;
+@@ -135,6 +137,10 @@ public abstract class AbstractClientPlayer extends EntityPlayer
+ 
+     public float getFovModifier()
+     {
++        if (NoFOV.isOn()) {
++            return (float) NoFOV.fov().getValue();
++        }
++
+         float f = 1.0F;
+ 
+         if (this.capabilities.isFlying)
+diff --git a/src/minecraft/net/minecraft/client/gui/GuiIngame.java b/src/minecraft/net/minecraft/client/gui/GuiIngame.java
+index 7e0a486..deb40e5 100644
+--- a/src/minecraft/net/minecraft/client/gui/GuiIngame.java
++++ b/src/minecraft/net/minecraft/client/gui/GuiIngame.java
+@@ -41,6 +41,8 @@ import net.minecraft.util.MovingObjectPosition;
+ import net.minecraft.util.ResourceLocation;
+ import net.minecraft.util.StringUtils;
+ import net.minecraft.world.border.WorldBorder;
++import net.unnamed.Unnamed;
++import net.unnamed.modules.render.AntiBlind;
+ import optifine.Config;
+ import optifine.CustomColors;
+ 
+@@ -357,7 +359,7 @@ public class GuiIngame extends Gui
+         {
+             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+             this.mc.getTextureManager().bindTexture(widgetsTexPath);
+-            EntityPlayer entityplayer = (EntityPlayer)this.mc.getRenderViewEntity();
++            EntityPlayer entityplayer = (EntityPlayer) Unnamed.clientSideWorld().get().cameras().getPlayerOrSupposedToBeViewEntity();
+             int i = sr.getScaledWidth() / 2;
+             float f = this.zLevel;
+             this.zLevel = -90.0F;
+@@ -938,7 +940,10 @@ public class GuiIngame extends Gui
+         GlStateManager.disableDepth();
+         GlStateManager.depthMask(false);
+         GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
+-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
++        float alpha = 1;
++        if (AntiBlind.isOn())
++            alpha = (float) AntiBlind.alpha().getValue();
++        GlStateManager.color(1.0F, 1.0F, 1.0F, alpha);
+         GlStateManager.disableAlpha();
+         this.mc.getTextureManager().bindTexture(pumpkinBlurTexPath);
+         Tessellator tessellator = Tessellator.getInstance();
+diff --git a/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java b/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java
+index debd63d..c447a6f 100644
+--- a/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java
++++ b/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java
+@@ -49,7 +49,8 @@ import net.minecraft.world.WorldProvider;
+ import net.minecraft.world.WorldSettings;
+ import net.minecraft.world.biome.BiomeGenBase;
+ import net.unnamed.Unnamed;
+-import net.unnamed.world.inputcontrol.Cameras;
++import net.unnamed.modules.render.AntiBlind;
++import net.unnamed.modules.render.NoHurtVibration;
+ import optifine.*;
+ import org.apache.logging.log4j.LogManager;
+ import org.apache.logging.log4j.Logger;
+@@ -70,6 +71,7 @@ import java.util.Date;
+ import java.util.List;
+ import java.util.Random;
+ import java.util.concurrent.Callable;
++import java.util.function.Predicate;
+ 
+ public class EntityRenderer implements IResourceManagerReloadListener
+ {
+@@ -477,12 +479,21 @@ public class EntityRenderer implements IResourceManagerReloadListener
+             this.pointedEntity = null;
+             Vec3 vec33 = null;
+             float f = 1.0F;
+-            List list = this.mc.theWorld.getEntitiesInAABBexcluding(entity, entity.getEntityBoundingBox().addCoord(vec31.xCoord * d0, vec31.yCoord * d0, vec31.zCoord * d0).expand((double)f, (double)f, (double)f), Predicates.and(EntitySelectors.NOT_SPECTATING, new EntityRendererPred(this)));
++            List list = this.mc.theWorld.getEntitiesInAABBexcluding(entity,
++                    entity.getEntityBoundingBox()
++                            .addCoord(vec31.xCoord * d0, vec31.yCoord * d0, vec31.zCoord * d0)
++                            .expand((double)f, (double)f, (double)f), Predicates.and(EntitySelectors.NOT_SPECTATING,
++                            new EntityRendererPred(this)));
++
++
+             double d2 = d1;
+ 
+             for (int i = 0; i < list.size(); ++i)
+             {
+                 Entity entity1 = (Entity)list.get(i);
++                if (Unnamed.clientSideWorld().get().isClientSideEntity(entity1))
++                    continue;
++
+                 float f1 = entity1.getCollisionBorderSize();
+                 AxisAlignedBB axisalignedbb = entity1.getEntityBoundingBox().expand((double)f1, (double)f1, (double)f1);
+                 MovingObjectPosition movingobjectposition = axisalignedbb.calculateIntercept(vec3, vec32);
+@@ -647,6 +658,9 @@ public class EntityRenderer implements IResourceManagerReloadListener
+ 
+     private void hurtCameraEffect(float partialTicks)
+     {
++        if (NoHurtVibration.isOn())
++            return;
++
+         if (this.mc.getRenderViewEntity() instanceof EntityLivingBase)
+         {
+             EntityLivingBase entitylivingbase = (EntityLivingBase)this.mc.getRenderViewEntity();
+@@ -1280,18 +1294,18 @@ public class EntityRenderer implements IResourceManagerReloadListener
+                 f2 = this.smoothCamFilterX * f4;
+                 f3 = this.smoothCamFilterY * f4;
+ 
+-                if (Unnamed.clientSideWorld().get().cameras().activeCamera().isDefined())
+-                    Unnamed.clientSideWorld().get().cameras().activeCamera().get().setAngles(f2, f3 * (float) b0);
+-                this.mc.thePlayer.setAngles(f2, f3 * (float)b0);
++                Unnamed.clientSideWorld().get()
++                        .cameras().activeCamera()
++                        .getOrElse(() -> (EntityPlayer)mc.thePlayer).setAngles(f2, f3 * (float) b0);
+             }
+             else
+             {
+                 this.smoothCamYaw = 0.0F;
+                 this.smoothCamPitch = 0.0F;
+ 
+-                if (Unnamed.clientSideWorld().get().cameras().activeCamera().isDefined())
+-                    Unnamed.clientSideWorld().get().cameras().activeCamera().get().setAngles(f2, f3 * (float) b0);
+-                this.mc.thePlayer.setAngles(f2, f3 * (float)b0);
++                Unnamed.clientSideWorld().get()
++                        .cameras().activeCamera()
++                        .getOrElse(() -> (EntityPlayer)mc.thePlayer).setAngles(f2, f3 * (float) b0);
+             }
+         }
+ 
+@@ -1377,6 +1391,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
+                     }
+                     else
+                     {
++                        // TODO: inject here for GUI drawing
+                         this.mc.currentScreen.drawScreen(j1, k1, p_181560_1_);
+                     }
+                 }
+@@ -1562,7 +1577,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
+             Shaders.setCamera(partialTicks);
+         }
+ 
+-        ActiveRenderInfo.updateRenderInfo(this.mc.thePlayer, this.mc.gameSettings.thirdPersonView == 2);
++        ActiveRenderInfo.updateRenderInfo(Unnamed.clientSideWorld().get().cameras().activeCamera().getOrElse(() -> mc.thePlayer) , this.mc.gameSettings.thirdPersonView == 2);
+         this.mc.mcProfiler.endStartSection("frustum");
+         ClippingHelperImpl.getInstance();
+         this.mc.mcProfiler.endStartSection("culling");
+@@ -2411,7 +2426,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
+         {
+             GlStateManager.setFogDensity(f1);
+         }
+-        else if (entity instanceof EntityLivingBase && ((EntityLivingBase)entity).isPotionActive(Potion.blindness))
++        else if (entity instanceof EntityLivingBase && ((EntityLivingBase)entity).isPotionActive(Potion.blindness) && !AntiBlind.isOn())
+         {
+             float f2 = 5.0F;
+             int i = ((EntityLivingBase)entity).getActivePotionEffect(Potion.blindness).getDuration();
+diff --git a/src/minecraft/net/minecraft/client/renderer/ItemRenderer.java b/src/minecraft/net/minecraft/client/renderer/ItemRenderer.java
+index 243c6f2..7e0cada 100644
+--- a/src/minecraft/net/minecraft/client/renderer/ItemRenderer.java
++++ b/src/minecraft/net/minecraft/client/renderer/ItemRenderer.java
+@@ -25,6 +25,7 @@ import net.minecraft.util.EnumWorldBlockLayer;
+ import net.minecraft.util.MathHelper;
+ import net.minecraft.util.ResourceLocation;
+ import net.minecraft.world.storage.MapData;
++import net.unnamed.modules.render.AntiBlind;
+ import optifine.Config;
+ import optifine.DynamicLights;
+ import optifine.Reflector;
+@@ -512,7 +513,10 @@ public class ItemRenderer
+     {
+         Tessellator tessellator = Tessellator.getInstance();
+         WorldRenderer worldrenderer = tessellator.getWorldRenderer();
+-        GlStateManager.color(1.0F, 1.0F, 1.0F, 0.9F);
++        float alpha = 1;
++        if (AntiBlind.isOn())
++            alpha = (float) AntiBlind.alpha().getValue();
++        GlStateManager.color(1.0F, 1.0F, 1.0F, 0.9F * alpha);
+         GlStateManager.depthFunc(519);
+         GlStateManager.depthMask(false);
+         GlStateManager.enableBlend();
+diff --git a/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java b/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java
+index e3ba7ac..8a7723f 100644
+--- a/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java
++++ b/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java
+@@ -785,9 +785,10 @@ public class RenderGlobal implements IWorldAccess, IResourceManagerReloadListene
+                                 boolean flag6 = this.mc.getRenderViewEntity() instanceof EntityLivingBase ? ((EntityLivingBase)this.mc.getRenderViewEntity()).isPlayerSleeping() : false;
+ 
+                                 if ((entity2 != this.mc.getRenderViewEntity() || this.mc.gameSettings.thirdPersonView != 0 || flag6 || (Unnamed.clientSideWorld().get().cameras().activeCamera().isDefined() && entity == mc.thePlayer))
+-                                        && (entity2.posY < 0.0D || entity2.posY >= 256.0D || this.theWorld.isBlockLoaded(new BlockPos(entity2))))
++                                        && (entity2.posY < 0.0D || entity2.posY >= 256.0D || this.theWorld.isBlockLoaded(new BlockPos(entity2))) && !Unnamed.clientSideWorld().get().isClientSideEntity(entity2))
+                                 {
+ 
++
+                                     ++this.countEntitiesRendered;
+ 
+                                     if (entity2.getClass() == EntityItemFrame.class)
+diff --git a/src/minecraft/net/minecraft/client/renderer/entity/RenderPlayer.java b/src/minecraft/net/minecraft/client/renderer/entity/RenderPlayer.java
+index ed3bbfb..b6d6f9d 100644
+--- a/src/minecraft/net/minecraft/client/renderer/entity/RenderPlayer.java
++++ b/src/minecraft/net/minecraft/client/renderer/entity/RenderPlayer.java
+@@ -18,6 +18,7 @@ import net.minecraft.scoreboard.Score;
+ import net.minecraft.scoreboard.ScoreObjective;
+ import net.minecraft.scoreboard.Scoreboard;
+ import net.minecraft.util.ResourceLocation;
++import net.unnamed.Unnamed;
+ 
+ public class RenderPlayer extends RendererLivingEntity<AbstractClientPlayer>
+ {
+@@ -54,7 +55,8 @@ public class RenderPlayer extends RendererLivingEntity<AbstractClientPlayer>
+      */
+     public void doRender(AbstractClientPlayer entity, double x, double y, double z, float entityYaw, float partialTicks)
+     {
+-        if (!entity.isUser() || this.renderManager.livingPlayer == entity)
++
++        if (!entity.isUser() || this.renderManager.livingPlayer == entity || (Unnamed.clientSideWorld().get().cameras().activeCamera().isDefined()))
+         {
+             double d0 = y;
+ 
+diff --git a/src/minecraft/net/minecraft/entity/Entity.java b/src/minecraft/net/minecraft/entity/Entity.java
+index 30bf1dc..8cf794b 100644
+--- a/src/minecraft/net/minecraft/entity/Entity.java
++++ b/src/minecraft/net/minecraft/entity/Entity.java
+@@ -1214,7 +1214,6 @@ public abstract class Entity implements ICommandSender
+      * Used in both water and by flying objects
+      */
+ 
+-    // TODO: used for calculate motion, use for Camera control
+     public void moveFlying(float strafe, float forward, float friction)
+     {
+         MovementCalculatePreEvent event = new MovementCalculatePreEvent(this, forward, strafe, friction);
+diff --git a/src/minecraft/net/unnamed/Unnamed.scala b/src/minecraft/net/unnamed/Unnamed.scala
+index 87fd683..2bcb78d 100644
+--- a/src/minecraft/net/unnamed/Unnamed.scala
++++ b/src/minecraft/net/unnamed/Unnamed.scala
+@@ -18,7 +18,6 @@ object Unnamed {
+   val launch: Unit = {
+ 
+     EventBus += new AlwaysActiveListener[WorldEvent]((event: WorldEvent) => {
+-      if (event.worldClient != null)
+         clientSideWorld = Some(new ClientSideWorld(event.worldClient))
+     })
+ 
+diff --git a/src/minecraft/net/unnamed/event/EventBus.scala b/src/minecraft/net/unnamed/event/EventBus.scala
+index c815aaa..3fcfeb2 100644
+--- a/src/minecraft/net/unnamed/event/EventBus.scala
++++ b/src/minecraft/net/unnamed/event/EventBus.scala
+@@ -8,10 +8,10 @@ import scala.reflect.ClassTag
+ 
+ case object EventBus {
+ 
+-  private val registry = new mutable.HashMap[ClassTag[Event], List[Listener[Event]]]
++  private val registry = new mutable.LinkedHashMap[ClassTag[Event], List[Listener[Event]]]
+     .withDefaultValue(Nil)
+ 
+-  private val oneShot = new mutable.HashMap[ClassTag[Event], List[OneShotListener[Event]]]
++  private val oneShot = new mutable.LinkedHashMap[ClassTag[Event], List[OneShotListener[Event]]]
+     .withDefaultValue(Nil)
+ 
+ 
+diff --git a/src/minecraft/net/unnamed/modules/Modules.scala b/src/minecraft/net/unnamed/modules/Modules.scala
+index a990c93..27a33fc 100644
+--- a/src/minecraft/net/unnamed/modules/Modules.scala
++++ b/src/minecraft/net/unnamed/modules/Modules.scala
+@@ -2,19 +2,22 @@ package net.unnamed.modules
+ 
+ import net.minecraft.client.gui.GuiIngameMenu
+ import net.unnamed.event.vanilla.{CurrentGUIScreenUpdateEvent, WorldEvent}
+-import net.unnamed.event.{AlwaysActiveListener, Event, EventBus, Listener}
++import net.unnamed.event.{AlwaysActiveListener, EventBus}
+ import net.unnamed.modules.antiexploit.AntiScanFromResourcePackConfirm
+-import net.unnamed.modules.render.{FreeCam, FullBright}
+-import net.unnamed.settings.Settings
++import net.unnamed.modules.render.{AntiBlind, FreeCam, FullBright, NoFOV, NoHurtVibration}
+ 
+ case object Modules {
+   var modules: List[Module] = Nil
+ 
+ 
+   {
++    // TODO: can we do that by reflection or do we need to reference explicitly here?
+     modules ::= FullBright
+     modules ::= AntiScanFromResourcePackConfirm
+     modules ::= FreeCam
++    modules ::= NoFOV
++    modules ::= NoHurtVibration
++    modules ::= AntiBlind
+ 
+ 
+     EventBus +=
+diff --git a/src/minecraft/net/unnamed/modules/render/AntiBlind.scala b/src/minecraft/net/unnamed/modules/render/AntiBlind.scala
+new file mode 100644
+index 0000000..5d1dc34
+--- /dev/null
++++ b/src/minecraft/net/unnamed/modules/render/AntiBlind.scala
+@@ -0,0 +1,8 @@
++package net.unnamed.modules.render
++
++import net.unnamed.modules.Module
++import net.unnamed.settings.setting.FloatSetting
++
++case object AntiBlind extends Module {
++  val alpha = new FloatSetting(.2f)
++}
+diff --git a/src/minecraft/net/unnamed/modules/render/FreeCam.scala b/src/minecraft/net/unnamed/modules/render/FreeCam.scala
+index 123f1e7..38f7fd2 100644
+--- a/src/minecraft/net/unnamed/modules/render/FreeCam.scala
++++ b/src/minecraft/net/unnamed/modules/render/FreeCam.scala
+@@ -4,7 +4,7 @@ import net.unnamed.modules.Module
+ import net.unnamed.settings.setting.FloatSetting
+ import net.unnamed.world.inputcontrol.{Cameras, FreeCamera}
+ 
+-object FreeCam extends Module {
++case object FreeCam extends Module {
+ 
+   val flySpeed = new FloatSetting(.1f)
+ 
+@@ -12,7 +12,7 @@ object FreeCam extends Module {
+ 
+   override def onEnable(): Unit = {
+     val freeCam = new FreeCamera()
+-    freeCam.capabilities.setFlySpeed(flySpeed.get)
++    freeCam.capabilities.setFlySpeed(flySpeed.getValue)
+     clientSideWorld.cameras.setActiveCamera(Some(freeCam))
+   }
+ 
+diff --git a/src/minecraft/net/unnamed/modules/render/FullBright.scala b/src/minecraft/net/unnamed/modules/render/FullBright.scala
+index c619bcf..89978dc 100644
+--- a/src/minecraft/net/unnamed/modules/render/FullBright.scala
++++ b/src/minecraft/net/unnamed/modules/render/FullBright.scala
+@@ -2,7 +2,7 @@ package net.unnamed.modules.render
+ 
+ import net.unnamed.modules.Module
+ 
+-object FullBright extends Module {
++case object FullBright extends Module {
+ 
+   var originalGama = 0f
+ 
+diff --git a/src/minecraft/net/unnamed/modules/render/NoFOV.scala b/src/minecraft/net/unnamed/modules/render/NoFOV.scala
+new file mode 100644
+index 0000000..12f1cc2
+--- /dev/null
++++ b/src/minecraft/net/unnamed/modules/render/NoFOV.scala
+@@ -0,0 +1,8 @@
++package net.unnamed.modules.render
++
++import net.unnamed.modules.Module
++import net.unnamed.settings.setting.{FloatSetting, IntegerSetting}
++
++case object NoFOV extends Module {
++  val fov = new FloatSetting(1)
++}
+diff --git a/src/minecraft/net/unnamed/modules/render/NoHurtVibration.scala b/src/minecraft/net/unnamed/modules/render/NoHurtVibration.scala
+new file mode 100644
+index 0000000..d613b14
+--- /dev/null
++++ b/src/minecraft/net/unnamed/modules/render/NoHurtVibration.scala
+@@ -0,0 +1,5 @@
++package net.unnamed.modules.render
++
++import net.unnamed.modules.Module
++
++case object NoHurtVibration extends Module
+diff --git a/src/minecraft/net/unnamed/settings/setting/Setting.scala b/src/minecraft/net/unnamed/settings/setting/Setting.scala
+index 9d238c7..c14ce37 100644
+--- a/src/minecraft/net/unnamed/settings/setting/Setting.scala
++++ b/src/minecraft/net/unnamed/settings/setting/Setting.scala
+@@ -12,13 +12,13 @@ trait Setting[T] {
+   @(Expose @annotation.meta.field)
+   var expr: String = null
+ 
+-  protected def getValue: T
++  protected def valueFromSetting: T
+ 
+-  def get: T = {
++  def getValue: T = {
+     //    if (expr.isDefined)
+     //      eval(expr)
+     //    else
+-    getValue
++    valueFromSetting
+   }
+ 
+   def set(value: T): Unit
+@@ -58,7 +58,7 @@ class BoolSetting(
+   override def set(value: Boolean): Unit =
+     on = value
+ 
+-  override def getValue: Boolean = on
++  override def valueFromSetting: Boolean = on
+ 
+   override val suggestedValue: String = default.toString
+ }
+@@ -68,7 +68,7 @@ class IntegerSetting(
+                       private var number: Int,
+                       private val suggestedLower: Int = 0,
+                       private val suggestedHigher: Int = 1) extends Setting[Int] {
+-  override def getValue: Int = number
++  override def valueFromSetting: Int = number
+ 
+   override def set(value: Int): Unit =
+     number = value
+@@ -82,7 +82,7 @@ class FloatSetting(
+                     private var number: Float,
+                     private val suggestedLower: Float = 0,
+                     private val suggestedHigher: Float = 1) extends Setting[Float] {
+-  override def getValue: Float = number
++  override def valueFromSetting: Float = number
+ 
+   override def set(value: Float): Unit =
+     number = value
+@@ -94,7 +94,7 @@ class ListSetting(
+                    @(Expose @annotation.meta.field)
+                    private var choice: String,
+                    private val suggestedList: List[String] = Nil) extends Setting[String] {
+-  override def getValue: String = choice
++  override def valueFromSetting: String = choice
+ 
+   override def set(value: String): Unit =
+     choice = value
+diff --git a/src/minecraft/net/unnamed/utils/REPLHelper.scala b/src/minecraft/net/unnamed/utils/REPLHelper.scala
+index 82bb1a4..b27d32b 100644
+--- a/src/minecraft/net/unnamed/utils/REPLHelper.scala
++++ b/src/minecraft/net/unnamed/utils/REPLHelper.scala
+@@ -3,7 +3,7 @@ package net.unnamed.utils
+ import net.minecraft.client.main.Main
+ 
+ object REPLHelper {
+-  def startMinecraft(args: Array[String] = Array("--username", "Unnamed")): Unit = {
++  def startMinecraft(args: Array[String] = Array("--username", "UnnamedPlayer")): Unit = {
+ 
+     new Thread() {
+       override def run(): Unit = {
+diff --git a/src/minecraft/net/unnamed/world/ClientSideWorld.scala b/src/minecraft/net/unnamed/world/ClientSideWorld.scala
+index eb36d69..be451fa 100644
+--- a/src/minecraft/net/unnamed/world/ClientSideWorld.scala
++++ b/src/minecraft/net/unnamed/world/ClientSideWorld.scala
+@@ -9,10 +9,16 @@ class ClientSideWorld (val world: World) extends MinecraftInstance {
+ 
+   val cameras = new Cameras
+ 
+-  var clientSideEntityId: Int = -1
++  val clientSideEntityIdBegin: Int = -10000000
++  var clientSideEntityId: Int = clientSideEntityIdBegin
+ 
++  // TODO: find other solution that is not so hacky
+   def addClientEntity(entity: Entity): Unit = {
+     mc.theWorld.addEntityToWorld(clientSideEntityId, entity)
+     clientSideEntityId -= 1
+   }
++
++  def isClientSideEntity(entity: Entity): Boolean = {
++    entity.getEntityId <= clientSideEntityIdBegin
++  }
+ }
+diff --git a/src/minecraft/net/unnamed/world/inputcontrol/CameraFixedOnEntity.scala b/src/minecraft/net/unnamed/world/inputcontrol/CameraFixedOnEntity.scala
+new file mode 100644
+index 0000000..83a2f10
+--- /dev/null
++++ b/src/minecraft/net/unnamed/world/inputcontrol/CameraFixedOnEntity.scala
+@@ -0,0 +1,17 @@
++package net.unnamed.world.inputcontrol
++
++import net.minecraft.client.Minecraft
++import net.minecraft.entity.Entity
++import net.minecraft.entity.player.EntityPlayer
++import net.unnamed.utils.common.ifce.{ClientInstance, MinecraftInstance}
++
++case class CameraFixedOnEntity(entity: Entity) extends EntityPlayer(Minecraft.getMinecraft.theWorld,
++Minecraft.getMinecraft.thePlayer.getGameProfile) with MinecraftInstance with ClientInstance {
++
++  override def onLivingUpdate(): Unit = {
++    super.onLivingUpdate()
++    setPosition(entity.posX, entity.posY, entity.posZ)
++  }
++
++  override def isSpectator: Boolean = true
++}
+diff --git a/src/minecraft/net/unnamed/world/inputcontrol/Cameras.scala b/src/minecraft/net/unnamed/world/inputcontrol/Cameras.scala
+index 89c737e..b755fac 100644
+--- a/src/minecraft/net/unnamed/world/inputcontrol/Cameras.scala
++++ b/src/minecraft/net/unnamed/world/inputcontrol/Cameras.scala
+@@ -9,8 +9,10 @@ class Cameras extends MinecraftInstance {
+   var activeCamera: Option[Entity] = None
+ 
+   def setActiveCamera(entity: Option[Entity]): Unit = {
+-    if (entity.isDefined)
++    if (entity.isDefined) {
+       cameras ::= entity.get
++      mc.entityRenderer.loadEntityShader(entity.get)
++    }
+     activeCamera = entity
+   }
+ 
+diff --git a/src/minecraft/net/unnamed/world/inputcontrol/FreeCamera.scala b/src/minecraft/net/unnamed/world/inputcontrol/FreeCamera.scala
+index 5daf135..103d6ea 100644
+--- a/src/minecraft/net/unnamed/world/inputcontrol/FreeCamera.scala
++++ b/src/minecraft/net/unnamed/world/inputcontrol/FreeCamera.scala
+@@ -16,17 +16,26 @@ class FreeCamera
+ 
+     Unnamed.clientSideWorld.get.addClientEntity(this)
+ 
+-    noClip = true
+     capabilities.isFlying = true
+ 
++  }
+ 
+-    setInvisible(true)
++  /**
++   * Called frequently so the entity can update its state every tick as required. For example, zombies and skeletons
++   * use this to react to sunlight and start to burn.
++   */
++  override def onLivingUpdate(): Unit ={
++    moveFlying(moveStrafing, moveForward, 0.1F)
++    moveEntity(motionX, motionY, motionZ)
++    motionX *= .8
++    motionY *= .8
++    motionZ *= .8
+   }
+ 
+   /**
+    * Returns whether the entity is in a server world
+    */
+-  override def isServerWorld: Boolean = true
++
+ 
+   override def moveFlying(strafe: Float, forward: Float, friction: Float): Unit = {
+ 
+@@ -42,17 +51,17 @@ class FreeCamera
+ 
+ 
+       if (inputControl.sneak)
+-        motionY -= capabilities.getFlySpeed * 3
++        motionY -= capabilities.getFlySpeed / 2
+ 
+       if (inputControl.jump)
+-        motionY += capabilities.getFlySpeed * 3
++        motionY += capabilities.getFlySpeed / 2
+     }
+ 
+-    super.moveFlying(inputStrafe, inputForward, friction)
++    super.moveFlying(inputStrafe, inputForward, capabilities.getFlySpeed)
+   }
+ 
+   /**
+    * Returns true if the player is in spectator mode.
+    */
+-  override def isSpectator: Boolean = false
++  override def isSpectator: Boolean = true
+ }
+diff --git a/src/minecraft/net/unnamed/world/inputcontrol/PlayerMovementControl.scala b/src/minecraft/net/unnamed/world/inputcontrol/PlayerMovementControl.scala
+index 23661d4..cce4d29 100644
+--- a/src/minecraft/net/unnamed/world/inputcontrol/PlayerMovementControl.scala
++++ b/src/minecraft/net/unnamed/world/inputcontrol/PlayerMovementControl.scala
+@@ -2,6 +2,7 @@ package net.unnamed.world.inputcontrol
+ 
+ import net.minecraft.client.settings.GameSettings
+ import net.minecraft.util.MovementInputFromOptions
++import net.unnamed.Unnamed
+ import net.unnamed.world.schedule.Scheduler
+ 
+ class PlayerMovementControl(val gameSettings: GameSettings) extends MovementInputFromOptions(gameSettings) {
+@@ -15,6 +16,8 @@ class PlayerMovementControl(val gameSettings: GameSettings) extends MovementInpu
+       sneak = movementInput.sneak
+       return
+     }
++    else if (Unnamed.clientSideWorld.get.cameras.activeCamera.isDefined)
++      return
+ 
+     super.updatePlayerMoveState()
+   }
+diff --git a/src/minecraft/optifine/VersionCheckThread.java b/src/minecraft/optifine/VersionCheckThread.java
+index 8b3001f..a20aa29 100644
+--- a/src/minecraft/optifine/VersionCheckThread.java
++++ b/src/minecraft/optifine/VersionCheckThread.java
+@@ -9,62 +9,63 @@ public class VersionCheckThread extends Thread
+ {
+     public void run()
+     {
+-        HttpURLConnection httpurlconnection = null;
+ 
+-        try
+-        {
+-            Config.dbg("Checking for new version");
+-            URL url = new URL("http://optifine.net/version/1.8.8/HD_U.txt");
+-            httpurlconnection = (HttpURLConnection)url.openConnection();
+-
+-            if (Config.getGameSettings().snooperEnabled)
+-            {
+-                httpurlconnection.setRequestProperty("OF-MC-Version", "1.8.8");
+-                httpurlconnection.setRequestProperty("OF-MC-Brand", "" + ClientBrandRetriever.getClientModName());
+-                httpurlconnection.setRequestProperty("OF-Edition", "HD_U");
+-                httpurlconnection.setRequestProperty("OF-Release", "H8");
+-                httpurlconnection.setRequestProperty("OF-Java-Version", "" + System.getProperty("java.version"));
+-                httpurlconnection.setRequestProperty("OF-CpuCount", "" + Config.getAvailableProcessors());
+-                httpurlconnection.setRequestProperty("OF-OpenGL-Version", "" + Config.openGlVersion);
+-                httpurlconnection.setRequestProperty("OF-OpenGL-Vendor", "" + Config.openGlVendor);
+-            }
+-
+-            httpurlconnection.setDoInput(true);
+-            httpurlconnection.setDoOutput(false);
+-            httpurlconnection.connect();
+-
+-            try
+-            {
+-                InputStream inputstream = httpurlconnection.getInputStream();
+-                String s = Config.readInputStream(inputstream);
+-                inputstream.close();
+-                String[] astring = Config.tokenize(s, "\n\r");
+-
+-                if (astring.length >= 1)
+-                {
+-                    String s1 = astring[0].trim();
+-                    Config.dbg("Version found: " + s1);
+-
+-                    if (Config.compareRelease(s1, "H8") <= 0)
+-                    {
+-                        return;
+-                    }
+-
+-                    Config.setNewRelease(s1);
+-                    return;
+-                }
+-            }
+-            finally
+-            {
+-                if (httpurlconnection != null)
+-                {
+-                    httpurlconnection.disconnect();
+-                }
+-            }
+-        }
+-        catch (Exception exception)
+-        {
+-            Config.dbg(exception.getClass().getName() + ": " + exception.getMessage());
+-        }
++//        HttpURLConnection httpurlconnection = null;
++//
++//        try
++//        {
++//            Config.dbg("Checking for new version");
++//            URL url = new URL("http://optifine.net/version/1.8.8/HD_U.txt");
++//            httpurlconnection = (HttpURLConnection)url.openConnection();
++//
++//            if (Config.getGameSettings().snooperEnabled)
++//            {
++//                httpurlconnection.setRequestProperty("OF-MC-Version", "1.8.8");
++//                httpurlconnection.setRequestProperty("OF-MC-Brand", "" + ClientBrandRetriever.getClientModName());
++//                httpurlconnection.setRequestProperty("OF-Edition", "HD_U");
++//                httpurlconnection.setRequestProperty("OF-Release", "H8");
++//                httpurlconnection.setRequestProperty("OF-Java-Version", "" + System.getProperty("java.version"));
++//                httpurlconnection.setRequestProperty("OF-CpuCount", "" + Config.getAvailableProcessors());
++//                httpurlconnection.setRequestProperty("OF-OpenGL-Version", "" + Config.openGlVersion);
++//                httpurlconnection.setRequestProperty("OF-OpenGL-Vendor", "" + Config.openGlVendor);
++//            }
++//
++//            httpurlconnection.setDoInput(true);
++//            httpurlconnection.setDoOutput(false);
++//            httpurlconnection.connect();
++//
++//            try
++//            {
++//                InputStream inputstream = httpurlconnection.getInputStream();
++//                String s = Config.readInputStream(inputstream);
++//                inputstream.close();
++//                String[] astring = Config.tokenize(s, "\n\r");
++//
++//                if (astring.length >= 1)
++//                {
++//                    String s1 = astring[0].trim();
++//                    Config.dbg("Version found: " + s1);
++//
++//                    if (Config.compareRelease(s1, "H8") <= 0)
++//                    {
++//                        return;
++//                    }
++//
++//                    Config.setNewRelease(s1);
++//                    return;
++//                }
++//            }
++//            finally
++//            {
++//                if (httpurlconnection != null)
++//                {
++//                    httpurlconnection.disconnect();
++//                }
++//            }
++//        }
++//        catch (Exception exception)
++//        {
++//            Config.dbg(exception.getClass().getName() + ": " + exception.getMessage());
++//        }
+     }
+ }
+diff --git a/src/minecraft/shadersmod/client/ShadersRender.java b/src/minecraft/shadersmod/client/ShadersRender.java
+index 4a9aa1f..167a92a 100644
+--- a/src/minecraft/shadersmod/client/ShadersRender.java
++++ b/src/minecraft/shadersmod/client/ShadersRender.java
+@@ -15,6 +15,7 @@ import net.minecraft.client.renderer.culling.ICamera;
+ import net.minecraft.client.renderer.texture.TextureMap;
+ import net.minecraft.entity.Entity;
+ import net.minecraft.util.EnumWorldBlockLayer;
++import net.unnamed.Unnamed;
+ import optifine.Reflector;
+ 
+ import org.lwjgl.opengl.EXTFramebufferObject;
+@@ -202,7 +203,7 @@ public class ShadersRender
+             minecraft.mcProfiler.endStartSection("shadow camera");
+             entityRenderer.setupCameraTransform(partialTicks, 2);
+             Shaders.setCameraShadow(partialTicks);
+-            ActiveRenderInfo.updateRenderInfo(minecraft.thePlayer, minecraft.gameSettings.thirdPersonView == 2);
++            ActiveRenderInfo.updateRenderInfo(Unnamed.clientSideWorld().get().cameras().activeCamera().getOrElse(() -> minecraft.thePlayer), minecraft.gameSettings.thirdPersonView == 2);
+             Shaders.checkGLError("shadow camera");
+             GL20.glDrawBuffers(Shaders.sfbDrawBuffers);
+             Shaders.checkGLError("shadow drawbuffers");
