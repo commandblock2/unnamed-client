@@ -3,7 +3,7 @@
     <option name="MAIN_CLASS_NAME" value="Start" />
     <module name="mcp918" />
     <option name="PROGRAM_PARAMETERS" value="--username UnnamedPlayer" />
-    <option name="VM_PARAMETERS" value="-Dlog4j2.formatMsgNoLookups=true -Djava.library.path=&quot;versions/1.8.8/1.8.8-natives" />
+    <option name="VM_PARAMETERS" value="-Dlog4j2.formatMsgNoLookups=true" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/../mcp918/jars" />
     <method v="2">
       <option name="Make" enabled="true" />

@@ -2,7 +2,7 @@
   <configuration default="false" name="Scala REPL" type="ScalaScriptConsoleRunConfiguration" factoryName="Scala Console" show_console_on_std_err="false" show_console_on_std_out="false">
     <module name="mcp918" />
     <option name="allowRunningInParallel" value="false" />
-    <option name="javaOptions" value="-Djline.terminal=NONE -Dlog4j2.formatMsgNoLookups=true -Djava.library.path=&quot;versions/1.8.8/1.8.8-natives" />
+    <option name="javaOptions" value="-Djline.terminal=NONE -Dlog4j2.formatMsgNoLookups=true" />
     <option name="myConsoleArgs" value="-usejavacp" />
     <option name="projectPathOnTarget" />
     <option name="selectedOptions">
