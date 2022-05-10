@@ -1,8 +1,8 @@
 # Unnamed Client
 A FOSS mcp hacked (ghost/automation is a priority) client for minecraft intended for at least half standard users or devs.  
-ScriptApi and REPL in game is supported (Soon).  
-However, it's likely that any GUI will not be completed any time soon.  
+ScriptApi and REPL in game is supported (but cannot be invoked yet lmao).  
 
+It's likely that any GUI will not be completed any time soon.  
 However, a Scala REPL run configuration was included in project files.
 simply run Scala REPL and type
 ```
@@ -51,3 +51,7 @@ The repository stores patches to build the development environment and scripts t
 Any help is appreciated, especially those can optimize workflow.  
 The client jar is very big right now, not sure if I would plan to put the dependencies in the json in the future  
 (you are going to download the libs anyway if you want to use the client **LEGALLY**).  
+
+
+## Why not LiquidBounce?
+LB is great in many aspects, except for performance
