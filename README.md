@@ -19,6 +19,8 @@ Also, **FUCK Eclipse, and generally all IDE for jvm for license**.
 
 ## Building on *nix
 ### Prerequisites
+**`dev-java/openjdk-8` and `dev-java/openjdk-17`**  
+Need java 8 for decompiling, and 17 for builiding/running(not sure if 11 will work)  
 `net-misc/curl` `sys-apps/coreutils` `app-arch/unzip` `dev-python/virtualenv`.  
 A instance of 1.8.8 is presented in the default path ready for mcp.      
 If located elsewhere, `mount --rbind` or `overlayfs` could be an option, MultiMC doesn't seem to be nice here.
