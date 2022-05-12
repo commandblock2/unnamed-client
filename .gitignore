@@ -4,4 +4,5 @@ py2venv4mcp/
 mcp918.zip
 optifine-src.zip
 idea-project/out/
-assets
+assets/libs
+assets/minecraft-unpack
