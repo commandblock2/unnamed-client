@@ -4,14 +4,13 @@ import net.minecraft.entity.Entity
 import net.unnamed.utils.common.ifce.MinecraftInstance
 
 class Cameras extends MinecraftInstance {
-  var cameras: List[Entity] = Nil
+  var cameras: Set[Entity] = Set()
 
   var activeCamera: Option[Entity] = None
 
   def setActiveCamera(entity: Option[Entity]): Unit = {
     if (entity.isDefined) {
-      cameras ::= entity.get
-      mc.entityRenderer.loadEntityShader(entity.get)
+      cameras += entity.get
     }
     activeCamera = entity
   }
