@@ -14,15 +14,20 @@ case object EventBus {
   private val oneShot = new mutable.LinkedHashMap[ClassTag[Event], List[OneShotListener[Event]]]
     .withDefaultValue(Nil)
 
+  private val tempRegistry = new mutable.LinkedHashMap[ClassTag[Event], List[Listener[Event]]]
+    .withDefaultValue(Nil)
+
+  private val tempOneShot = new mutable.LinkedHashMap[ClassTag[Event], List[OneShotListener[Event]]]
+    .withDefaultValue(Nil)
+
 
   def registerListener[SubEvent <: Event](listener: Listener[SubEvent]): EventBus.type = {
-    registry(listener.tag.asInstanceOf[ClassTag[Event]]) ::= listener.asInstanceOf[Listener[Event]]
+    tempRegistry(listener.tag.asInstanceOf[ClassTag[Event]]) ::= listener.asInstanceOf[Listener[Event]]
     this
   }
 
   def unRegisterListener[SubEvent <: Event](listener: Listener[SubEvent]): EventBus.type = {
-    val clazz = listener.tag.asInstanceOf[ClassTag[Event]]
-    registry(clazz) = removeASingleElementFromList(listener.asInstanceOf[Listener[Event]], registry(clazz))
+    listener.shouldUnRegister = true
     this
   }
 
@@ -32,7 +37,7 @@ case object EventBus {
   }
 
   def next[SubEvent <: Event](oneShotListener: OneShotListener[SubEvent]): EventBus.type = {
-    oneShot(oneShotListener.tag.asInstanceOf[ClassTag[Event]]) ::= oneShotListener.asInstanceOf[OneShotListener[Event]]
+    tempOneShot(oneShotListener.tag.asInstanceOf[ClassTag[Event]]) ::= oneShotListener.asInstanceOf[OneShotListener[Event]]
     this
   }
 
@@ -41,11 +46,21 @@ case object EventBus {
   }
 
   def fireEvent[SubEvent <: Event](event: SubEvent)(implicit tag: ClassTag[SubEvent]): Unit = {
-    registry(tag.asInstanceOf[ClassTag[Event]])
+    val subEvent = tag.asInstanceOf[ClassTag[Event]]
+
+    registry(subEvent) ++= tempRegistry(subEvent)
+    tempRegistry(subEvent) = Nil
+
+    oneShot(subEvent) ++= tempOneShot(subEvent)
+    tempOneShot(subEvent) = Nil
+    
+    registry(subEvent) = registry(subEvent).filter((value: Listener[Event]) => !value.shouldUnRegister)
+
+    registry(subEvent)
       .filter((value: Listener[Event]) => value.isActive)
       .foreach((listener: Listener[Event]) => listener.callback(event))
 
-    oneShot(tag.asInstanceOf[ClassTag[Event]]) = oneShot(tag.asInstanceOf[ClassTag[Event]]).filter((listener: OneShotListener[Event]) => {
+    oneShot(subEvent) = oneShot(subEvent).filter((listener: OneShotListener[Event]) => {
       listener.timesToCall -= 1
       if (listener.timesToCall == 0) {
         listener.callback(event)

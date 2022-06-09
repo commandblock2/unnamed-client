@@ -1,10 +1,10 @@
 package net.unnamed.modules.render
 
+import net.unnamed.camera.{Cameras, FreeCamera}
 import net.unnamed.event.EventBus
-import net.unnamed.event.vanilla.PlayerLivingUpdateBeginEvent
+import net.unnamed.event.vanilla.tick.PlayerLivingUpdateBeginEvent
 import net.unnamed.modules.Module
 import net.unnamed.settings.setting.FloatSetting
-import net.unnamed.world.inputcontrol.{Cameras, FreeCamera}
 
 case object FreeCam extends Module {
 
@@ -17,11 +17,11 @@ case object FreeCam extends Module {
     EventBus.next()((_: PlayerLivingUpdateBeginEvent) => {
       val freeCam = new FreeCamera()
       freeCam.capabilities.setFlySpeed(flySpeed.getValue)
-      clientSideWorld.cameras.setActiveCamera(Some(freeCam))
+      Cameras.setActiveCamera(Some(freeCam))
     })
   }
 
   override def onDisable(): Unit = {
-    clientSideWorld.cameras.activeCamera = None
+    Cameras.activeCamera = None
   }
 }

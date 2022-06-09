@@ -1,4 +1,4 @@
-package net.unnamed.world.inputcontrol
+package net.unnamed.camera
 
 import net.minecraft.client.Minecraft
 import net.minecraft.entity.player.EntityPlayer
@@ -42,7 +42,7 @@ class FreeCamera
     var inputStrafe = strafe
     var inputForward = forward
 
-    if (clientSideWorld.cameras.activeCamera.isDefined && clientSideWorld.cameras.activeCamera.get == this) {
+    if (Cameras.activeCamera.isDefined && Cameras.activeCamera.get == this) {
       val inputControl = new MovementInputFromOptions(mc.gameSettings)
       inputControl.updatePlayerMoveState()
 

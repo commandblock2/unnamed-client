@@ -18,16 +18,72 @@ index 1718dab..754ca20 100644
    </component>
  </module>
 \ No newline at end of file
+diff --git a/src/minecraft/net/minecraft/client/Minecraft.java b/src/minecraft/net/minecraft/client/Minecraft.java
+index 06aa958..84b7186 100644
+--- a/src/minecraft/net/minecraft/client/Minecraft.java
++++ b/src/minecraft/net/minecraft/client/Minecraft.java
+@@ -89,16 +89,16 @@ import net.unnamed.Unnamed;
+ import net.unnamed.event.EventBus;
+ import net.unnamed.event.vanilla.ClientShutDownEvent;
+ import net.unnamed.event.vanilla.CurrentGUIScreenUpdateEvent;
++import net.unnamed.event.vanilla.WindowResizeEvent;
+ import net.unnamed.event.vanilla.WorldEvent;
+-import net.unnamed.world.inputcontrol.PlayerMovementControl;
++import net.unnamed.camera.Cameras;
++import net.unnamed.camera.PlayerMovementControl;
+ import org.apache.commons.io.IOUtils;
+ import org.apache.commons.lang3.Validate;
+ import org.apache.logging.log4j.LogManager;
+ import org.apache.logging.log4j.Logger;
+ 
+ import org.lwjgl.opengl.GL11C;
+-import org.lwjgl.opengl.GL46;
+-import org.lwjgl.system.SharedLibraryUtil;
+ import org.lwjglx.LWJGLException;
+ import org.lwjglx.Sys;
+ import org.lwjglx.input.Keyboard;
+@@ -1633,6 +1633,8 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+      */
+     private void resize(int width, int height)
+     {
++        EventBus.fireEventJ(new WindowResizeEvent(width, height));
++
+         this.displayWidth = Math.max(1, width);
+         this.displayHeight = Math.max(1, height);
+ 
+@@ -2126,6 +2128,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+                     this.theWorld.setLastLightningBolt(this.theWorld.getLastLightningBolt() - 1);
+                 }
+ 
++                // TODO: onLivingUpdate
+                 this.theWorld.updateEntities();
+             }
+         }
+@@ -3127,8 +3130,8 @@ public class Minecraft implements IThreadListener, IPlayerUsage
+     public Entity getRenderViewEntity()
+     {
+         if (Unnamed.clientSideWorld().isDefined()
+-                && Unnamed.clientSideWorld().get().cameras().activeCamera().isDefined())
+-            return Unnamed.clientSideWorld().get().cameras().activeCamera().get();
++                && Cameras.activeCamera().isDefined())
++            return Cameras.activeCamera().get();
+ 
+         return this.renderViewEntity;
+     }
 diff --git a/src/minecraft/net/minecraft/client/entity/EntityPlayerSP.java b/src/minecraft/net/minecraft/client/entity/EntityPlayerSP.java
-index ca18441..1be543f 100644
+index ca18441..1cce6c4 100644
 --- a/src/minecraft/net/minecraft/client/entity/EntityPlayerSP.java
 +++ b/src/minecraft/net/minecraft/client/entity/EntityPlayerSP.java
-@@ -53,10 +53,10 @@ import net.minecraft.world.IInteractionObject;
+@@ -52,11 +52,12 @@ import net.minecraft.util.ResourceLocation;
+ import net.minecraft.world.IInteractionObject;
  import net.minecraft.world.World;
  import net.unnamed.event.EventBus;
- import net.unnamed.event.vanilla.PlayerLivingUpdateBeginEvent;
+-import net.unnamed.event.vanilla.PlayerLivingUpdateBeginEvent;
+-import net.unnamed.world.schedule.Scheduler;
++import net.unnamed.event.vanilla.tick.PlayerLivingUpdateBeginEvent;
 +import net.unnamed.modules.movement.Sprint;
- import net.unnamed.world.schedule.Scheduler;
++import net.unnamed.schedule.Scheduler;
++import net.unnamed.schedule.resource.PlayerControllableAction;
  
 -public class EntityPlayerSP extends AbstractClientPlayer
 -{
@@ -35,7 +91,7 @@ index ca18441..1be543f 100644
      public final NetHandlerPlayClient sendQueue;
      private final StatFileWriter statWriter;
  
-@@ -90,10 +90,14 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -90,10 +91,14 @@ public class EntityPlayerSP extends AbstractClientPlayer
       */
      private float lastReportedPitch;
  
@@ -52,7 +108,7 @@ index ca18441..1be543f 100644
      private boolean serverSprintState;
  
      /**
-@@ -113,7 +117,9 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -113,7 +118,9 @@ public class EntityPlayerSP extends AbstractClientPlayer
       */
      protected int sprintToggleTimer;
  
@@ -63,7 +119,7 @@ index ca18441..1be543f 100644
      public int sprintingTicksLeft;
      public float renderArmYaw;
      public float renderArmPitch;
-@@ -122,14 +128,17 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -122,14 +129,17 @@ public class EntityPlayerSP extends AbstractClientPlayer
      private int horseJumpPowerCounter;
      private float horseJumpPower;
  
@@ -85,7 +141,7 @@ index ca18441..1be543f 100644
          super(worldIn, netHandler.getGameProfile());
          this.sendQueue = netHandler;
          this.statWriter = statFile;
-@@ -140,47 +149,38 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -140,47 +150,38 @@ public class EntityPlayerSP extends AbstractClientPlayer
      /**
       * Called when the entity is attacked.
       */
@@ -142,7 +198,7 @@ index ca18441..1be543f 100644
                  this.onUpdateWalkingPlayer();
              }
          }
-@@ -189,18 +189,13 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -189,18 +190,13 @@ public class EntityPlayerSP extends AbstractClientPlayer
      /**
       * called every tick when the player is on foot. Performs all the things that normally happen during movement.
       */
@@ -165,7 +221,7 @@ index ca18441..1be543f 100644
                  this.sendQueue.addToSendQueue(new C0BPacketEntityAction(this, C0BPacketEntityAction.Action.STOP_SPRINTING));
              }
  
-@@ -209,67 +204,50 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -209,67 +205,50 @@ public class EntityPlayerSP extends AbstractClientPlayer
  
          boolean flag1 = this.isSneaking();
  
@@ -247,7 +303,7 @@ index ca18441..1be543f 100644
                  this.lastReportedYaw = this.rotationYaw;
                  this.lastReportedPitch = this.rotationPitch;
              }
-@@ -279,8 +257,7 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -279,8 +258,7 @@ public class EntityPlayerSP extends AbstractClientPlayer
      /**
       * Called when player presses the drop item key
       */
@@ -257,7 +313,7 @@ index ca18441..1be543f 100644
          C07PacketPlayerDigging.Action c07packetplayerdigging$action = dropAll ? C07PacketPlayerDigging.Action.DROP_ALL_ITEMS : C07PacketPlayerDigging.Action.DROP_ITEM;
          this.sendQueue.addToSendQueue(new C07PacketPlayerDigging(c07packetplayerdigging$action, BlockPos.ORIGIN, EnumFacing.DOWN));
          return null;
-@@ -289,29 +266,25 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -289,29 +267,25 @@ public class EntityPlayerSP extends AbstractClientPlayer
      /**
       * Joins the passed in entity item with the world. Args: entityItem
       */
@@ -291,7 +347,7 @@ index ca18441..1be543f 100644
          this.sendQueue.addToSendQueue(new C16PacketClientStatus(C16PacketClientStatus.EnumState.PERFORM_RESPAWN));
      }
  
-@@ -319,10 +292,8 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -319,10 +293,8 @@ public class EntityPlayerSP extends AbstractClientPlayer
       * Deals damage to the entity. If its a EntityPlayer then will take damage from the armor first and then health
       * second with the reduced value. Args: damageAmount
       */
@@ -304,7 +360,7 @@ index ca18441..1be543f 100644
              this.setHealth(this.getHealth() - damageAmount);
          }
      }
-@@ -330,48 +301,38 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -330,48 +302,38 @@ public class EntityPlayerSP extends AbstractClientPlayer
      /**
       * set current crafting inventory back to the 2x2 square
       */
@@ -363,7 +419,7 @@ index ca18441..1be543f 100644
              this.setHealth(health);
              this.hasValidHealth = true;
          }
-@@ -380,12 +341,9 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -380,12 +342,9 @@ public class EntityPlayerSP extends AbstractClientPlayer
      /**
       * Adds a value to a statistic field.
       */
@@ -379,7 +435,7 @@ index ca18441..1be543f 100644
                  super.addStat(stat, amount);
              }
          }
-@@ -394,110 +352,89 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -394,110 +353,89 @@ public class EntityPlayerSP extends AbstractClientPlayer
      /**
       * Sends the player's abilities to the server (if there is one).
       */
@@ -517,7 +573,7 @@ index ca18441..1be543f 100644
                  }
              }
  
-@@ -508,16 +445,14 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -508,16 +446,14 @@ public class EntityPlayerSP extends AbstractClientPlayer
      /**
       * Returns true if the block at the given BlockPos and the block above it are NOT full cubes.
       */
@@ -536,7 +592,7 @@ index ca18441..1be543f 100644
          super.setSprinting(sprinting);
          this.sprintingTicksLeft = sprinting ? 600 : 0;
      }
-@@ -525,8 +460,7 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -525,8 +461,7 @@ public class EntityPlayerSP extends AbstractClientPlayer
      /**
       * Sets the current XP, total XP, and level number.
       */
@@ -546,7 +602,7 @@ index ca18441..1be543f 100644
          this.experience = currentXP;
          this.experienceTotal = maxXP;
          this.experienceLevel = level;
-@@ -535,16 +469,14 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -535,16 +470,14 @@ public class EntityPlayerSP extends AbstractClientPlayer
      /**
       * Send a chat message to the CommandSender
       */
@@ -565,7 +621,7 @@ index ca18441..1be543f 100644
          return permLevel <= 0;
      }
  
-@@ -552,53 +484,44 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -552,53 +485,44 @@ public class EntityPlayerSP extends AbstractClientPlayer
       * Get the position in the world. <b>{@code null} is not allowed!</b> If you are not an entity in the world, return
       * the coordinates 0, 0, 0
       */
@@ -629,7 +685,7 @@ index ca18441..1be543f 100644
              this.mc.displayGuiScreen(new GuiScreenBook(this, bookStack, true));
          }
      }
-@@ -606,108 +529,80 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -606,181 +530,139 @@ public class EntityPlayerSP extends AbstractClientPlayer
      /**
       * Displays the GUI for interacting with a chest inventory. Args: chestInventory
       */
@@ -757,11 +813,14 @@ index ca18441..1be543f 100644
  
 -    protected boolean isCurrentViewEntity()
 -    {
+-        return this.mc.getRenderViewEntity() == this || Scheduler.isPlayerControlledByScheduler();
 +    protected boolean isCurrentViewEntity() {
-         return this.mc.getRenderViewEntity() == this || Scheduler.isPlayerControlledByScheduler();
++        return this.mc.getRenderViewEntity() == this
++                || Scheduler.isManagedByScheduler(PlayerControllableAction.AIM())
++                || Scheduler.isManagedByScheduler(PlayerControllableAction.MOVEMENT_INPUT());
      }
  
-@@ -715,72 +610,56 @@ public class EntityPlayerSP extends AbstractClientPlayer
+     /**
       * Called frequently so the entity can update its state every tick as required. For example, zombies and skeletons
       * use this to react to sunlight and start to burn.
       */
@@ -849,7 +908,7 @@ index ca18441..1be543f 100644
              --this.timeUntilPortal;
          }
  
-@@ -790,59 +669,46 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -790,59 +672,46 @@ public class EntityPlayerSP extends AbstractClientPlayer
          boolean flag2 = this.movementInput.moveForward >= f;
          this.movementInput.updatePlayerMoveState();
  
@@ -928,7 +987,7 @@ index ca18441..1be543f 100644
                      this.capabilities.isFlying = !this.capabilities.isFlying;
                      this.sendPlayerAbilities();
                      this.flyToggleTimer = 0;
-@@ -850,64 +716,47 @@ public class EntityPlayerSP extends AbstractClientPlayer
+@@ -850,64 +719,47 @@ public class EntityPlayerSP extends AbstractClientPlayer
              }
          }
  
@@ -1010,3 +1069,549 @@ index ca18441..1be543f 100644
              this.capabilities.isFlying = false;
              this.sendPlayerAbilities();
          }
+diff --git a/src/minecraft/net/minecraft/client/gui/GuiIngame.java b/src/minecraft/net/minecraft/client/gui/GuiIngame.java
+index deb40e5..f408d14 100644
+--- a/src/minecraft/net/minecraft/client/gui/GuiIngame.java
++++ b/src/minecraft/net/minecraft/client/gui/GuiIngame.java
+@@ -41,8 +41,8 @@ import net.minecraft.util.MovingObjectPosition;
+ import net.minecraft.util.ResourceLocation;
+ import net.minecraft.util.StringUtils;
+ import net.minecraft.world.border.WorldBorder;
+-import net.unnamed.Unnamed;
+ import net.unnamed.modules.render.AntiBlind;
++import net.unnamed.camera.Cameras;
+ import optifine.Config;
+ import optifine.CustomColors;
+ 
+@@ -359,7 +359,7 @@ public class GuiIngame extends Gui
+         {
+             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+             this.mc.getTextureManager().bindTexture(widgetsTexPath);
+-            EntityPlayer entityplayer = (EntityPlayer) Unnamed.clientSideWorld().get().cameras().getPlayerOrSupposedToBeViewEntity();
++            EntityPlayer entityplayer = (EntityPlayer) Cameras.getPlayerOrSupposedToBeViewEntity();
+             int i = sr.getScaledWidth() / 2;
+             float f = this.zLevel;
+             this.zLevel = -90.0F;
+diff --git a/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java b/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java
+index 09b0d0b..63c4470 100644
+--- a/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java
++++ b/src/minecraft/net/minecraft/client/network/NetHandlerPlayClient.java
+@@ -1087,6 +1087,7 @@ public class NetHandlerPlayClient implements INetHandlerPlayClient
+         PacketThreadUtil.checkThreadAndEnqueue(packetIn, this, this.gameController);
+         Explosion explosion = new Explosion(this.gameController.theWorld, (Entity)null, packetIn.getX(), packetIn.getY(), packetIn.getZ(), packetIn.getStrength(), packetIn.getAffectedBlockPositions());
+         explosion.doExplosionB(true);
++        // TODO: velocity injection
+         this.gameController.thePlayer.motionX += (double)packetIn.func_149149_c();
+         this.gameController.thePlayer.motionY += (double)packetIn.func_149144_d();
+         this.gameController.thePlayer.motionZ += (double)packetIn.func_149147_e();
+diff --git a/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java b/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java
+index 665e02d..12fe2b5 100644
+--- a/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java
++++ b/src/minecraft/net/minecraft/client/renderer/EntityRenderer.java
+@@ -53,6 +53,7 @@ import net.unnamed.event.EventBus;
+ import net.unnamed.event.vanilla.Render3DEvent;
+ import net.unnamed.modules.render.AntiBlind;
+ import net.unnamed.modules.render.NoHurtVibration;
++import net.unnamed.camera.Cameras;
+ import optifine.*;
+ import org.apache.logging.log4j.LogManager;
+ import org.apache.logging.log4j.Logger;
+@@ -73,7 +74,6 @@ import java.util.Date;
+ import java.util.List;
+ import java.util.Random;
+ import java.util.concurrent.Callable;
+-import java.util.function.Predicate;
+ 
+ public class EntityRenderer implements IResourceManagerReloadListener
+ {
+@@ -442,7 +442,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
+     {
+         Entity entity =
+                 Unnamed.clientSideWorld().isDefined() ?
+-                Unnamed.clientSideWorld().get().cameras().getPlayerOrSupposedToBeViewEntity() :
++                Cameras.getPlayerOrSupposedToBeViewEntity() :
+                         mc.getRenderViewEntity();
+ 
+         if (entity != null && this.mc.theWorld != null)
+@@ -1296,8 +1296,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
+                 f2 = this.smoothCamFilterX * f4;
+                 f3 = this.smoothCamFilterY * f4;
+ 
+-                Unnamed.clientSideWorld().get()
+-                        .cameras().activeCamera()
++                Cameras.activeCamera()
+                         .getOrElse(() -> (EntityPlayer)mc.thePlayer).setAngles(f2, f3 * (float) b0);
+             }
+             else
+@@ -1305,8 +1304,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
+                 this.smoothCamYaw = 0.0F;
+                 this.smoothCamPitch = 0.0F;
+ 
+-                Unnamed.clientSideWorld().get()
+-                        .cameras().activeCamera()
++                Cameras.activeCamera()
+                         .getOrElse(() -> (EntityPlayer)mc.thePlayer).setAngles(f2, f3 * (float) b0);
+             }
+         }
+@@ -1447,7 +1445,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
+         }
+         else
+         {
+-            Entity entity = Unnamed.clientSideWorld().get().cameras().getPlayerOrSupposedToBeViewEntity();
++            Entity entity = Cameras.getPlayerOrSupposedToBeViewEntity();
+             boolean flag = entity instanceof EntityPlayer && !this.mc.gameSettings.hideGUI;
+ 
+             if (flag && !((EntityPlayer)entity).capabilities.allowEdit)
+@@ -1579,7 +1577,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
+             Shaders.setCamera(partialTicks);
+         }
+ 
+-        ActiveRenderInfo.updateRenderInfo(Unnamed.clientSideWorld().get().cameras().activeCamera().getOrElse(() -> mc.thePlayer) , this.mc.gameSettings.thirdPersonView == 2);
++        ActiveRenderInfo.updateRenderInfo(Cameras.activeCamera().getOrElse(() -> mc.thePlayer) , this.mc.gameSettings.thirdPersonView == 2);
+         this.mc.mcProfiler.endStartSection("frustum");
+         ClippingHelperImpl.getInstance();
+         this.mc.mcProfiler.endStartSection("culling");
+diff --git a/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java b/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java
+index 34e0e31..d14137e 100644
+--- a/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java
++++ b/src/minecraft/net/minecraft/client/renderer/RenderGlobal.java
+@@ -90,9 +90,8 @@ import net.minecraft.world.IWorldAccess;
+ import net.minecraft.world.WorldProvider;
+ import net.minecraft.world.border.WorldBorder;
+ import net.minecraft.world.chunk.Chunk;
+-import net.unnamed.Unnamed;
+ import net.unnamed.world.ClientSideWorld;
+-import net.unnamed.world.inputcontrol.Cameras;
++import net.unnamed.camera.Cameras;
+ import optifine.ChunkUtils;
+ import optifine.CloudRenderer;
+ import optifine.Config;
+@@ -785,7 +784,7 @@ public class RenderGlobal implements IWorldAccess, IResourceManagerReloadListene
+ 
+                                 boolean flag6 = this.mc.getRenderViewEntity() instanceof EntityLivingBase ? ((EntityLivingBase)this.mc.getRenderViewEntity()).isPlayerSleeping() : false;
+ 
+-                                if ((entity2 != this.mc.getRenderViewEntity() || this.mc.gameSettings.thirdPersonView != 0 || flag6 || (Unnamed.clientSideWorld().get().cameras().activeCamera().isDefined() && entity == mc.thePlayer))
++                                if ((entity2 != this.mc.getRenderViewEntity() || this.mc.gameSettings.thirdPersonView != 0 || flag6 || (Cameras.activeCamera().isDefined() && entity == mc.thePlayer))
+                                         && (entity2.posY < 0.0D || entity2.posY >= 256.0D || this.theWorld.isBlockLoaded(new BlockPos(entity2))) && !ClientSideWorld.isClientSideEntity(entity2))
+                                 {
+ 
+diff --git a/src/minecraft/net/minecraft/client/renderer/entity/RenderPlayer.java b/src/minecraft/net/minecraft/client/renderer/entity/RenderPlayer.java
+index 633ffc8..e9d4f48 100644
+--- a/src/minecraft/net/minecraft/client/renderer/entity/RenderPlayer.java
++++ b/src/minecraft/net/minecraft/client/renderer/entity/RenderPlayer.java
+@@ -1,6 +1,5 @@
+ package net.minecraft.client.renderer.entity;
+ 
+-import net.minecraft.client.Minecraft;
+ import net.minecraft.client.entity.AbstractClientPlayer;
+ import net.minecraft.client.entity.EntityPlayerSP;
+ import net.minecraft.client.model.ModelPlayer;
+@@ -18,7 +17,7 @@ import net.minecraft.scoreboard.Score;
+ import net.minecraft.scoreboard.ScoreObjective;
+ import net.minecraft.scoreboard.Scoreboard;
+ import net.minecraft.util.ResourceLocation;
+-import net.unnamed.Unnamed;
++import net.unnamed.camera.Cameras;
+ 
+ public class RenderPlayer extends RendererLivingEntity<AbstractClientPlayer>
+ {
+@@ -57,7 +56,7 @@ public class RenderPlayer extends RendererLivingEntity<AbstractClientPlayer>
+     {
+ 
+         if (!entity.isUser() || this.renderManager.livingPlayer == entity ||
+-                (Unnamed.clientSideWorld().get().cameras().shouldRenderThePlayer(partialTicks)))
++                (Cameras.shouldRenderThePlayer(partialTicks)))
+         {
+             double d0 = y;
+ 
+diff --git a/src/minecraft/net/minecraft/entity/Entity.java b/src/minecraft/net/minecraft/entity/Entity.java
+index 57ef1da..af79983 100644
+--- a/src/minecraft/net/minecraft/entity/Entity.java
++++ b/src/minecraft/net/minecraft/entity/Entity.java
+@@ -12,6 +12,7 @@ import net.minecraft.block.BlockWall;
+ import net.minecraft.block.material.Material;
+ import net.minecraft.block.state.IBlockState;
+ import net.minecraft.block.state.pattern.BlockPattern;
++import net.minecraft.client.Minecraft;
+ import net.minecraft.command.CommandResultStats;
+ import net.minecraft.command.ICommandSender;
+ import net.minecraft.crash.CrashReport;
+@@ -587,141 +588,144 @@ public abstract class Entity implements ICommandSender
+     /**
+      * Tries to moves the entity by the passed in displacement. Args: x, y, z
+      */
+-    public void moveEntity(double x, double y, double z)
++    public void moveEntity(double actualOffsetX,
++                           double actualOffsetY,
++                           double actualOffsetZ)
++    // why the fuck would you reassign a fucking parameter
+     {
+         if (this.noClip)
+         {
+-            this.setEntityBoundingBox(this.getEntityBoundingBox().offset(x, y, z));
++            this.setEntityBoundingBox(this.getEntityBoundingBox().offset(actualOffsetX, actualOffsetY, actualOffsetZ));
+             this.resetPositionToBB();
+         }
+         else
+         {
+             this.worldObj.theProfiler.startSection("move");
+-            double d0 = this.posX;
+-            double d1 = this.posY;
+-            double d2 = this.posZ;
++            double posX = this.posX;
++            double posY = this.posY;
++            double posZ = this.posZ;
+ 
+             if (this.isInWeb)
+             {
+                 this.isInWeb = false;
+-                x *= 0.25D;
+-                y *= 0.05000000074505806D;
+-                z *= 0.25D;
++                actualOffsetX *= 0.25D;
++                actualOffsetY *= 0.05000000074505806D;
++                actualOffsetZ *= 0.25D;
+                 this.motionX = 0.0D;
+                 this.motionY = 0.0D;
+                 this.motionZ = 0.0D;
+             }
+ 
+-            double d3 = x;
+-            double d4 = y;
+-            double d5 = z;
+-            boolean flag = this.onGround && this.isSneaking() && this instanceof EntityPlayer;
++            double uncollidedOffsetXSneakingProcessed = actualOffsetX;
++            double uncollidedOffsetYSneakingProcessed = actualOffsetY;
++            double uncollidedOffsetZSneakingProcessed = actualOffsetZ;
++            boolean sneakingLogic = this.onGround && this.isSneaking() && this instanceof EntityPlayer;
+ 
+-            if (flag)
++            if (sneakingLogic)
+             {
+                 double d6;
+ 
+-                for (d6 = 0.05D; x != 0.0D && this.worldObj.getCollidingBoundingBoxes(this, this.getEntityBoundingBox().offset(x, -1.0D, 0.0D)).isEmpty(); d3 = x)
++                for (d6 = 0.05D; actualOffsetX != 0.0D && this.worldObj.getCollidingBoundingBoxes(this, this.getEntityBoundingBox().offset(actualOffsetX, -1.0D, 0.0D)).isEmpty(); uncollidedOffsetXSneakingProcessed = actualOffsetX)
+                 {
+-                    if (x < d6 && x >= -d6)
++                    if (actualOffsetX < d6 && actualOffsetX >= -d6)
+                     {
+-                        x = 0.0D;
++                        actualOffsetX = 0.0D;
+                     }
+-                    else if (x > 0.0D)
++                    else if (actualOffsetX > 0.0D)
+                     {
+-                        x -= d6;
++                        actualOffsetX -= d6;
+                     }
+                     else
+                     {
+-                        x += d6;
++                        actualOffsetX += d6;
+                     }
+                 }
+ 
+-                for (; z != 0.0D && this.worldObj.getCollidingBoundingBoxes(this, this.getEntityBoundingBox().offset(0.0D, -1.0D, z)).isEmpty(); d5 = z)
++                for (; actualOffsetZ != 0.0D && this.worldObj.getCollidingBoundingBoxes(this, this.getEntityBoundingBox().offset(0.0D, -1.0D, actualOffsetZ)).isEmpty(); uncollidedOffsetZSneakingProcessed = actualOffsetZ)
+                 {
+-                    if (z < d6 && z >= -d6)
++                    if (actualOffsetZ < d6 && actualOffsetZ >= -d6)
+                     {
+-                        z = 0.0D;
++                        actualOffsetZ = 0.0D;
+                     }
+-                    else if (z > 0.0D)
++                    else if (actualOffsetZ > 0.0D)
+                     {
+-                        z -= d6;
++                        actualOffsetZ -= d6;
+                     }
+                     else
+                     {
+-                        z += d6;
++                        actualOffsetZ += d6;
+                     }
+                 }
+ 
+-                for (; x != 0.0D && z != 0.0D && this.worldObj.getCollidingBoundingBoxes(this, this.getEntityBoundingBox().offset(x, -1.0D, z)).isEmpty(); d5 = z)
++                for (; actualOffsetX != 0.0D && actualOffsetZ != 0.0D && this.worldObj.getCollidingBoundingBoxes(this, this.getEntityBoundingBox().offset(actualOffsetX, -1.0D, actualOffsetZ)).isEmpty(); uncollidedOffsetZSneakingProcessed = actualOffsetZ)
+                 {
+-                    if (x < d6 && x >= -d6)
++                    if (actualOffsetX < d6 && actualOffsetX >= -d6)
+                     {
+-                        x = 0.0D;
++                        actualOffsetX = 0.0D;
+                     }
+-                    else if (x > 0.0D)
++                    else if (actualOffsetX > 0.0D)
+                     {
+-                        x -= d6;
++                        actualOffsetX -= d6;
+                     }
+                     else
+                     {
+-                        x += d6;
++                        actualOffsetX += d6;
+                     }
+ 
+-                    d3 = x;
++                    uncollidedOffsetXSneakingProcessed = actualOffsetX;
+ 
+-                    if (z < d6 && z >= -d6)
++                    if (actualOffsetZ < d6 && actualOffsetZ >= -d6)
+                     {
+-                        z = 0.0D;
++                        actualOffsetZ = 0.0D;
+                     }
+-                    else if (z > 0.0D)
++                    else if (actualOffsetZ > 0.0D)
+                     {
+-                        z -= d6;
++                        actualOffsetZ -= d6;
+                     }
+                     else
+                     {
+-                        z += d6;
++                        actualOffsetZ += d6;
+                     }
+                 }
+             }
+ 
+-            List<AxisAlignedBB> list1 = this.worldObj.getCollidingBoundingBoxes(this, this.getEntityBoundingBox().addCoord(x, y, z));
++            List<AxisAlignedBB> allBox = this.worldObj.getCollidingBoundingBoxes(this, this.getEntityBoundingBox().addCoord(actualOffsetX, actualOffsetY, actualOffsetZ));
+             AxisAlignedBB axisalignedbb = this.getEntityBoundingBox();
+ 
+-            for (AxisAlignedBB axisalignedbb1 : list1)
++            for (AxisAlignedBB axisalignedbb1 : allBox)
+             {
+-                y = axisalignedbb1.calculateYOffset(this.getEntityBoundingBox(), y);
++                actualOffsetY = axisalignedbb1.calculateYOffset(this.getEntityBoundingBox(), actualOffsetY);
+             }
+ 
+-            this.setEntityBoundingBox(this.getEntityBoundingBox().offset(0.0D, y, 0.0D));
+-            boolean flag1 = this.onGround || d4 != y && d4 < 0.0D;
++            this.setEntityBoundingBox(this.getEntityBoundingBox().offset(0.0D, actualOffsetY, 0.0D));
++            boolean flag1 = this.onGround || uncollidedOffsetYSneakingProcessed != actualOffsetY && uncollidedOffsetYSneakingProcessed < 0.0D;
+ 
+-            for (AxisAlignedBB axisalignedbb2 : list1)
++            for (AxisAlignedBB axisalignedbb2 : allBox)
+             {
+-                x = axisalignedbb2.calculateXOffset(this.getEntityBoundingBox(), x);
++                actualOffsetX = axisalignedbb2.calculateXOffset(this.getEntityBoundingBox(), actualOffsetX);
+             }
+ 
+-            this.setEntityBoundingBox(this.getEntityBoundingBox().offset(x, 0.0D, 0.0D));
++            this.setEntityBoundingBox(this.getEntityBoundingBox().offset(actualOffsetX, 0.0D, 0.0D));
+ 
+-            for (AxisAlignedBB axisalignedbb13 : list1)
++            for (AxisAlignedBB axisalignedbb13 : allBox)
+             {
+-                z = axisalignedbb13.calculateZOffset(this.getEntityBoundingBox(), z);
++                actualOffsetZ = axisalignedbb13.calculateZOffset(this.getEntityBoundingBox(), actualOffsetZ);
+             }
+ 
+-            this.setEntityBoundingBox(this.getEntityBoundingBox().offset(0.0D, 0.0D, z));
++            this.setEntityBoundingBox(this.getEntityBoundingBox().offset(0.0D, 0.0D, actualOffsetZ));
+ 
+-            if (this.stepHeight > 0.0F && flag1 && (d3 != x || d5 != z))
++            if (this.stepHeight > 0.0F && flag1 && (uncollidedOffsetXSneakingProcessed != actualOffsetX || uncollidedOffsetZSneakingProcessed != actualOffsetZ))
+             {
+-                double d11 = x;
+-                double d7 = y;
+-                double d8 = z;
++                double d11 = actualOffsetX;
++                double d7 = actualOffsetY;
++                double d8 = actualOffsetZ;
+                 AxisAlignedBB axisalignedbb3 = this.getEntityBoundingBox();
+                 this.setEntityBoundingBox(axisalignedbb);
+-                y = (double)this.stepHeight;
+-                List<AxisAlignedBB> list = this.worldObj.getCollidingBoundingBoxes(this, this.getEntityBoundingBox().addCoord(d3, y, d5));
++                actualOffsetY = (double)this.stepHeight;
++                List<AxisAlignedBB> list = this.worldObj.getCollidingBoundingBoxes(this, this.getEntityBoundingBox().addCoord(uncollidedOffsetXSneakingProcessed, actualOffsetY, uncollidedOffsetZSneakingProcessed));
+                 AxisAlignedBB axisalignedbb4 = this.getEntityBoundingBox();
+-                AxisAlignedBB axisalignedbb5 = axisalignedbb4.addCoord(d3, 0.0D, d5);
+-                double d9 = y;
++                AxisAlignedBB axisalignedbb5 = axisalignedbb4.addCoord(uncollidedOffsetXSneakingProcessed, 0.0D, uncollidedOffsetZSneakingProcessed);
++                double d9 = actualOffsetY;
+ 
+                 for (AxisAlignedBB axisalignedbb6 : list)
+                 {
+@@ -729,7 +733,7 @@ public abstract class Entity implements ICommandSender
+                 }
+ 
+                 axisalignedbb4 = axisalignedbb4.offset(0.0D, d9, 0.0D);
+-                double d15 = d3;
++                double d15 = uncollidedOffsetXSneakingProcessed;
+ 
+                 for (AxisAlignedBB axisalignedbb7 : list)
+                 {
+@@ -737,7 +741,7 @@ public abstract class Entity implements ICommandSender
+                 }
+ 
+                 axisalignedbb4 = axisalignedbb4.offset(d15, 0.0D, 0.0D);
+-                double d16 = d5;
++                double d16 = uncollidedOffsetZSneakingProcessed;
+ 
+                 for (AxisAlignedBB axisalignedbb8 : list)
+                 {
+@@ -746,7 +750,7 @@ public abstract class Entity implements ICommandSender
+ 
+                 axisalignedbb4 = axisalignedbb4.offset(0.0D, 0.0D, d16);
+                 AxisAlignedBB axisalignedbb14 = this.getEntityBoundingBox();
+-                double d17 = y;
++                double d17 = actualOffsetY;
+ 
+                 for (AxisAlignedBB axisalignedbb9 : list)
+                 {
+@@ -754,7 +758,7 @@ public abstract class Entity implements ICommandSender
+                 }
+ 
+                 axisalignedbb14 = axisalignedbb14.offset(0.0D, d17, 0.0D);
+-                double d18 = d3;
++                double d18 = uncollidedOffsetXSneakingProcessed;
+ 
+                 for (AxisAlignedBB axisalignedbb10 : list)
+                 {
+@@ -762,7 +766,7 @@ public abstract class Entity implements ICommandSender
+                 }
+ 
+                 axisalignedbb14 = axisalignedbb14.offset(d18, 0.0D, 0.0D);
+-                double d19 = d5;
++                double d19 = uncollidedOffsetZSneakingProcessed;
+ 
+                 for (AxisAlignedBB axisalignedbb11 : list)
+                 {
+@@ -775,31 +779,31 @@ public abstract class Entity implements ICommandSender
+ 
+                 if (d20 > d10)
+                 {
+-                    x = d15;
+-                    z = d16;
+-                    y = -d9;
++                    actualOffsetX = d15;
++                    actualOffsetZ = d16;
++                    actualOffsetY = -d9;
+                     this.setEntityBoundingBox(axisalignedbb4);
+                 }
+                 else
+                 {
+-                    x = d18;
+-                    z = d19;
+-                    y = -d17;
++                    actualOffsetX = d18;
++                    actualOffsetZ = d19;
++                    actualOffsetY = -d17;
+                     this.setEntityBoundingBox(axisalignedbb14);
+                 }
+ 
+                 for (AxisAlignedBB axisalignedbb12 : list)
+                 {
+-                    y = axisalignedbb12.calculateYOffset(this.getEntityBoundingBox(), y);
++                    actualOffsetY = axisalignedbb12.calculateYOffset(this.getEntityBoundingBox(), actualOffsetY);
+                 }
+ 
+-                this.setEntityBoundingBox(this.getEntityBoundingBox().offset(0.0D, y, 0.0D));
++                this.setEntityBoundingBox(this.getEntityBoundingBox().offset(0.0D, actualOffsetY, 0.0D));
+ 
+-                if (d11 * d11 + d8 * d8 >= x * x + z * z)
++                if (d11 * d11 + d8 * d8 >= actualOffsetX * actualOffsetX + actualOffsetZ * actualOffsetZ)
+                 {
+-                    x = d11;
+-                    y = d7;
+-                    z = d8;
++                    actualOffsetX = d11;
++                    actualOffsetY = d7;
++                    actualOffsetZ = d8;
+                     this.setEntityBoundingBox(axisalignedbb3);
+                 }
+             }
+@@ -807,9 +811,10 @@ public abstract class Entity implements ICommandSender
+             this.worldObj.theProfiler.endSection();
+             this.worldObj.theProfiler.startSection("rest");
+             this.resetPositionToBB();
+-            this.isCollidedHorizontally = d3 != x || d5 != z;
+-            this.isCollidedVertically = d4 != y;
+-            this.onGround = this.isCollidedVertically && d4 < 0.0D;
++            this.isCollidedHorizontally = uncollidedOffsetXSneakingProcessed != actualOffsetX
++                    || uncollidedOffsetZSneakingProcessed != actualOffsetZ;
++            this.isCollidedVertically = uncollidedOffsetYSneakingProcessed != actualOffsetY;
++            this.onGround = this.isCollidedVertically && uncollidedOffsetYSneakingProcessed < 0.0D;
+             this.isCollided = this.isCollidedHorizontally || this.isCollidedVertically;
+             int i = MathHelper.floor_double(this.posX);
+             int j = MathHelper.floor_double(this.posY - 0.20000000298023224D);
+@@ -828,28 +833,28 @@ public abstract class Entity implements ICommandSender
+                 }
+             }
+ 
+-            this.updateFallState(y, this.onGround, block1, blockpos);
++            this.updateFallState(actualOffsetY, this.onGround, block1, blockpos);
+ 
+-            if (d3 != x)
++            if (uncollidedOffsetXSneakingProcessed != actualOffsetX)
+             {
+                 this.motionX = 0.0D;
+             }
+ 
+-            if (d5 != z)
++            if (uncollidedOffsetZSneakingProcessed != actualOffsetZ)
+             {
+                 this.motionZ = 0.0D;
+             }
+ 
+-            if (d4 != y)
++            if (uncollidedOffsetYSneakingProcessed != actualOffsetY)
+             {
+                 block1.onLanded(this.worldObj, this);
+             }
+ 
+-            if (this.canTriggerWalking() && !flag && this.ridingEntity == null)
++            if (this.canTriggerWalking() && !sneakingLogic && this.ridingEntity == null)
+             {
+-                double d12 = this.posX - d0;
+-                double d13 = this.posY - d1;
+-                double d14 = this.posZ - d2;
++                double d12 = this.posX - posX;
++                double d13 = this.posY - posY;
++                double d14 = this.posZ - posZ;
+ 
+                 if (block1 != Blocks.ladder)
+                 {
+diff --git a/src/minecraft/net/minecraft/entity/EntityHanging.java b/src/minecraft/net/minecraft/entity/EntityHanging.java
+index 608b5db..80bbbde 100644
+--- a/src/minecraft/net/minecraft/entity/EntityHanging.java
++++ b/src/minecraft/net/minecraft/entity/EntityHanging.java
+@@ -203,9 +203,9 @@ public abstract class EntityHanging extends Entity
+     /**
+      * Tries to moves the entity by the passed in displacement. Args: x, y, z
+      */
+-    public void moveEntity(double x, double y, double z)
++    public void moveEntity(double actualOffsetX, double actualOffsetY, double actualOffsetZ)
+     {
+-        if (!this.worldObj.isRemote && !this.isDead && x * x + y * y + z * z > 0.0D)
++        if (!this.worldObj.isRemote && !this.isDead && actualOffsetX * actualOffsetX + actualOffsetY * actualOffsetY + actualOffsetZ * actualOffsetZ > 0.0D)
+         {
+             this.setDead();
+             this.onBroken((Entity)null);
+diff --git a/src/minecraft/shadersmod/client/ShadersRender.java b/src/minecraft/shadersmod/client/ShadersRender.java
+index 167a92a..9dfd438 100644
+--- a/src/minecraft/shadersmod/client/ShadersRender.java
++++ b/src/minecraft/shadersmod/client/ShadersRender.java
+@@ -15,7 +15,7 @@ import net.minecraft.client.renderer.culling.ICamera;
+ import net.minecraft.client.renderer.texture.TextureMap;
+ import net.minecraft.entity.Entity;
+ import net.minecraft.util.EnumWorldBlockLayer;
+-import net.unnamed.Unnamed;
++import net.unnamed.camera.Cameras;
+ import optifine.Reflector;
+ 
+ import org.lwjgl.opengl.EXTFramebufferObject;
+@@ -203,7 +203,7 @@ public class ShadersRender
+             minecraft.mcProfiler.endStartSection("shadow camera");
+             entityRenderer.setupCameraTransform(partialTicks, 2);
+             Shaders.setCameraShadow(partialTicks);
+-            ActiveRenderInfo.updateRenderInfo(Unnamed.clientSideWorld().get().cameras().activeCamera().getOrElse(() -> minecraft.thePlayer), minecraft.gameSettings.thirdPersonView == 2);
++            ActiveRenderInfo.updateRenderInfo(Cameras.activeCamera().getOrElse(() -> minecraft.thePlayer), minecraft.gameSettings.thirdPersonView == 2);
+             Shaders.checkGLError("shadow camera");
+             GL20.glDrawBuffers(Shaders.sfbDrawBuffers);
+             Shaders.checkGLError("shadow drawbuffers");

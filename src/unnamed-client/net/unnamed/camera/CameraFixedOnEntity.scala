@@ -1,4 +1,4 @@
-package net.unnamed.world.inputcontrol
+package net.unnamed.camera
 
 import net.minecraft.client.Minecraft
 import net.minecraft.entity.Entity

@@ -1,12 +1,17 @@
-package net.unnamed.world.inputcontrol
+package net.unnamed.camera
 
 import net.minecraft.entity.Entity
 import net.unnamed.utils.common.ifce.MinecraftInstance
 
-class Cameras extends MinecraftInstance {
+object Cameras extends MinecraftInstance {
   var cameras: Set[Entity] = Set()
 
   var activeCamera: Option[Entity] = None
+
+  def clear(): Unit = {
+    cameras = Set()
+    activeCamera = None
+  }
 
   def setActiveCamera(entity: Option[Entity]): Unit = {
     if (entity.isDefined) {
@@ -23,6 +28,7 @@ class Cameras extends MinecraftInstance {
   }
 
   def shouldRenderThePlayer(partialTicks: Float): Boolean = {
-    activeCamera.isDefined && !mc.thePlayer.getEntityBoundingBox.isVecInside(activeCamera.get.getPositionEyes(partialTicks))
+    activeCamera.isDefined &&
+      !mc.thePlayer.getEntityBoundingBox.isVecInside(activeCamera.get.getPositionEyes(partialTicks))
   }
 }

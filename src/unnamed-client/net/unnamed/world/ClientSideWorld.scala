@@ -3,25 +3,23 @@ package net.unnamed.world
 import net.minecraft.client.multiplayer.WorldClient
 import net.minecraft.entity.Entity
 import net.unnamed.Unnamed
-import net.unnamed.Unnamed.clientSideWorld
+import net.unnamed.camera.Cameras
 import net.unnamed.event.unnamed.ActiveSettingsChangedEvent
 import net.unnamed.event.vanilla.WorldEvent
-import net.unnamed.event.{AlwaysActiveListener, Event, EventBus}
+import net.unnamed.event.{AlwaysActiveListener, EventBus}
 import net.unnamed.scripting.scripts.{Script, Scripts}
 import net.unnamed.settings.Settings
 import net.unnamed.utils.common.ifce.MinecraftInstance
-import net.unnamed.world.inputcontrol.Cameras
 
 import java.io.File
 
 class ClientSideWorld(val world: WorldClient) extends MinecraftInstance {
 
-  val cameras = new Cameras
-
   var moduleEvalContext: Script = null
 
 
   {
+    Cameras.clear()
     reloadScripts()
   }
 

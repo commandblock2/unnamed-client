@@ -2,6 +2,7 @@ package net.unnamed.event.unnamed
 
 import net.minecraft.network.play.client.C02PacketUseEntity
 import net.minecraft.network.play.server.{S12PacketEntityVelocity, S32PacketConfirmTransaction}
+import net.unnamed.event.vanilla.tick.PlayerMovementCalculatePreEvent
 import net.unnamed.event.vanilla.{AttackedEvent, MovementCalculatePreEvent, PacketEvent}
 import net.unnamed.event.{AlwaysActiveListener, EventBus}
 import net.unnamed.utils.common.ifce.MinecraftInstance

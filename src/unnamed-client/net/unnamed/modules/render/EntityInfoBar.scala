@@ -2,7 +2,7 @@ package net.unnamed.modules.render
 
 import net.minecraft.entity.{Entity, EntityLivingBase}
 import net.unnamed.Unnamed
-
+import net.unnamed.camera.Cameras
 import net.unnamed.event.vanilla.Render3DEvent
 import net.unnamed.modules.Module
 import net.unnamed.settings.setting.{BoolSetting, ColorSetting, EntitySelectorSetting, FloatSetting, IntegerSetting}
@@ -38,7 +38,7 @@ case object EntityInfoBar extends Module {
       .stream()
       .filter((entity: Entity) =>
         entitySelector.getValue.isTarget(entity) &&
-          (entity != mc.getRenderViewEntity || Unnamed.clientSideWorld.get.cameras.shouldRenderThePlayer(event.partialTicks)))
+          (entity != mc.getRenderViewEntity || Cameras.shouldRenderThePlayer(event.partialTicks)))
       .forEach((entity: Entity) => {
         val entityOffset = EntityInterpolationUtil.getPartialTicksOffset(entity)(event.partialTicks)
         val entityBox = entity.getEntityBoundingBox

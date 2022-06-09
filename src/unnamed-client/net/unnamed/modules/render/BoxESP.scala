@@ -2,6 +2,7 @@ package net.unnamed.modules.render
 
 import net.minecraft.entity.Entity
 import net.unnamed.Unnamed
+import net.unnamed.camera.Cameras
 import net.unnamed.event.vanilla.Render3DEvent
 import net.unnamed.modules.Module
 import net.unnamed.settings.setting.{ColorSetting, EntitySelectorSetting}
@@ -22,7 +23,7 @@ case object BoxESP extends Module {
           !ClientSideWorld.isClientSideEntity(entity) &&
           entity.getEntityBoundingBox != Entity.ZERO_AABB &&
           (entity != mc.getRenderViewEntity ||
-            Unnamed.clientSideWorld.get.cameras.shouldRenderThePlayer(event.partialTicks)))
+            Cameras.shouldRenderThePlayer(event.partialTicks)))
       .forEach((entity: Entity) =>
         RenderUtils.drawEntityBB(entity)(partialTicks = event.partialTicks)(color.getValue))
   )

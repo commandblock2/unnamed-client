@@ -1,6 +1,6 @@
 package net.unnamed.modules.movement
 
-import net.unnamed.event.vanilla.PlayerLivingUpdateBeginEvent
+import net.unnamed.event.vanilla.tick.PlayerLivingUpdateBeginEvent
 import net.unnamed.modules.Module
 import net.unnamed.settings.setting.BoolSetting
 
