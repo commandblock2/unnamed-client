@@ -2,13 +2,13 @@
   <library name="lwjgl.nanovg" type="repository">
     <properties maven-id="org.lwjgl:lwjgl-nanovg:LATEST" />
     <CLASSES>
-      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl-nanovg/3.3.1/lwjgl-nanovg-3.3.1.jar!/" />
-      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl-nanovg/3.3.2/lwjgl-nanovg-3.3.2.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl/3.3.2/lwjgl-3.3.2.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES>
-      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl-nanovg/3.3.1/lwjgl-nanovg-3.3.1-sources.jar!/" />
-      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-sources.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl-nanovg/3.3.2/lwjgl-nanovg-3.3.2-sources.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl/3.3.2/lwjgl-3.3.2-sources.jar!/" />
     </SOURCES>
   </library>
 </component>

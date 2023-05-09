@@ -12,7 +12,7 @@ case object TriggerBot
   val entitySelector = new EntitySelectorSetting()
 
   onEvent((_: Render3DEvent) => {
-    // TODO: better logic for deciding clicking
+    // TODO: better logic for clicking
     if (
       mc.currentScreen == null &&
       mc.objectMouseOver != null &&

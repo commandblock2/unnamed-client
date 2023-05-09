@@ -3,6 +3,7 @@ package net.unnamed.modules.render
 import net.minecraft.entity.{Entity, EntityLivingBase}
 import net.unnamed.Unnamed
 import net.unnamed.camera.Cameras
+import net.unnamed.event.unnamed.Render3DMVPEvet
 import net.unnamed.event.vanilla.Render3DEvent
 import net.unnamed.modules.Module
 import net.unnamed.settings.setting.{BoolSetting, ColorSetting, EntitySelectorSetting, FloatSetting, IntegerSetting}
@@ -24,7 +25,7 @@ case object EntityInfoBar extends Module {
 
   val entitySelector = new EntitySelectorSetting()
 
-  onEvent((event: Render3DEvent) => {
+  onEvent((event: Render3DMVPEvet) => {
 
 
     val mvMatrix = getMatrix(GL11.GL_MODELVIEW_MATRIX)
@@ -32,15 +33,13 @@ case object EntityInfoBar extends Module {
 
     val renderManager = mc.getRenderManager
 
-    RenderUtils.MVPSetup()
-
     mc.theWorld.loadedEntityList
       .stream()
       .filter((entity: Entity) =>
         entitySelector.getValue.isTarget(entity) &&
-          (entity != mc.getRenderViewEntity || Cameras.shouldRenderThePlayer(event.partialTicks)))
+          (entity != mc.getRenderViewEntity || Cameras.shouldRenderThePlayer(event.render3DEvent.partialTicks)))
       .forEach((entity: Entity) => {
-        val entityOffset = EntityInterpolationUtil.getPartialTicksOffset(entity)(event.partialTicks)
+        val entityOffset = EntityInterpolationUtil.getPartialTicksOffset(entity)(event.render3DEvent.partialTicks)
         val entityBox = entity.getEntityBoundingBox
           .offset(entityOffset.xCoord, entityOffset.yCoord, entityOffset.zCoord)
           .offset(-(renderManager.renderPosX), -(renderManager.renderPosY), -(renderManager.renderPosZ))
@@ -112,7 +111,5 @@ case object EntityInfoBar extends Module {
 
         }
       })
-
-    RenderUtils.MVPEnd()
   })
 }

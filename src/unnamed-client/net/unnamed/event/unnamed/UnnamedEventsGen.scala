@@ -3,8 +3,9 @@ package net.unnamed.event.unnamed
 import net.minecraft.network.play.client.C02PacketUseEntity
 import net.minecraft.network.play.server.{S12PacketEntityVelocity, S32PacketConfirmTransaction}
 import net.unnamed.event.vanilla.tick.PlayerMovementCalculatePreEvent
-import net.unnamed.event.vanilla.{AttackedEvent, MovementCalculatePreEvent, PacketEvent}
-import net.unnamed.event.{AlwaysActiveListener, EventBus}
+import net.unnamed.event.vanilla.{AttackedEvent, MovementCalculatePreEvent, PacketEvent, Render3DEvent}
+import net.unnamed.event.{AlwaysActiveListener, Event, EventBus}
+import net.unnamed.utils.RenderUtils
 import net.unnamed.utils.common.ifce.MinecraftInstance
 
 case object UnnamedEventsGen extends MinecraftInstance {
@@ -42,6 +43,11 @@ case object UnnamedEventsGen extends MinecraftInstance {
             event.friction = strafeEvent.friction
           }
         }
-      )
+      ) +=
+      new AlwaysActiveListener[Render3DEvent]((event: Render3DEvent) => {
+        RenderUtils.MVPSetup()
+        EventBus.fireEvent(Render3DMVPEvet(event))
+        RenderUtils.MVPEnd()
+      })
   }
 }

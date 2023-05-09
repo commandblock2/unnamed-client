@@ -2,17 +2,19 @@
   <library name="graalvm.js" type="repository">
     <properties maven-id="org.graalvm.js:js:LATEST" />
     <CLASSES>
-      <root url="jar://$PROJECT_DIR$/../assets/libs/js-22.1.0.1.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/regex-22.1.0.1.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/truffle-api-22.1.0.1.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/graal-sdk-22.1.0.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/js-22.3.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/regex-22.3.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/truffle-api-22.3.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/graal-sdk-22.3.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/icu4j-71.1.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES>
-      <root url="jar://$PROJECT_DIR$/../assets/libs/js-22.1.0.1-sources.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/regex-22.1.0.1-sources.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/truffle-api-22.1.0.1-sources.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../assets/libs/graal-sdk-22.1.0.1-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/js-22.3.2-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/regex-22.3.2-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/truffle-api-22.3.2-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/graal-sdk-22.3.2-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../assets/libs/icu4j-71.1-sources.jar!/" />
     </SOURCES>
   </library>
 </component>

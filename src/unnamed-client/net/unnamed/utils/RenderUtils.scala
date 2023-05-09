@@ -14,7 +14,6 @@ import java.awt.Color
 
 case object RenderUtils extends MinecraftInstance {
 
-
   // Skid from LB
 
   def MVPSetup(): Unit = {
